@@ -33,6 +33,61 @@ def startup():
     create_tables()
 
 
+# ═══════════════════════════════════════════
+# ONE-TIME SETUP — creates admin + seeds data
+# Protected by SETUP_KEY env variable
+# Visit: /setup?key=YOUR_SETUP_KEY
+# ═══════════════════════════════════════════
+
+@app.get("/setup", response_class=HTMLResponse)
+def setup(
+    key:        str = "",
+    email:      str = "",
+    password:   str = "",
+    db: Session = Depends(get_db)
+):
+    setup_key = os.environ.get("SETUP_KEY", "")
+    if not setup_key or key != setup_key:
+        return HTMLResponse("<h2>Invalid or missing setup key.</h2>", status_code=403)
+
+    # If just visiting the page, show the form
+    if not email or not password:
+        return HTMLResponse("""
+        <html><body style="font-family:sans-serif;max-width:400px;margin:60px auto;padding:20px;">
+        <h2>Oxford Dashboard — First Time Setup</h2>
+        <p>Create your admin account:</p>
+        <form method="get">
+          <input type="hidden" name="key" value="{key}">
+          <p><label>Email<br><input name="email" type="email" style="width:100%;padding:8px;" required></label></p>
+          <p><label>Password<br><input name="password" type="password" style="width:100%;padding:8px;" required></label></p>
+          <button type="submit" style="padding:10px 20px;background:#1c1a16;color:white;border:none;cursor:pointer;">
+            Create Admin &amp; Seed Data
+          </button>
+        </form>
+        </body></html>
+        """.replace("{key}", key))
+
+    # Run seed
+    from seed import seed
+    try:
+        seed(email, password)
+        return HTMLResponse(f"""
+        <html><body style="font-family:sans-serif;max-width:400px;margin:60px auto;padding:20px;">
+        <h2>✓ Setup complete</h2>
+        <p>Admin account created for <strong>{email}</strong></p>
+        <p>All designers and historical client assignments have been loaded.</p>
+        <p><a href="/login" style="background:#1c1a16;color:white;padding:10px 20px;text-decoration:none;">
+          Go to Login →
+        </a></p>
+        <p style="margin-top:30px;color:#999;font-size:12px;">
+          You can now remove the SETUP_KEY environment variable from Railway to disable this page.
+        </p>
+        </body></html>
+        """)
+    except Exception as e:
+        return HTMLResponse(f"<h2>Error during setup:</h2><pre>{e}</pre>", status_code=500)
+
+
 # ── Handle auth redirects cleanly ───────────────────────────────────
 @app.exception_handler(_LoginRedirect)
 async def login_redirect_handler(request: Request, exc: _LoginRedirect):
