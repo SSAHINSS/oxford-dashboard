@@ -32,14 +32,14 @@
       <tr class="client-row" data-name="{{ client.name | lower }}">
 
         <!-- Client name -->
-        <td>
+        <td data-val="{{ client.name }}">
           <a href="/clients/{{ client.id }}" class="c-link">
             <div class="c-name">{{ client.name }}</div>
           </a>
         </td>
 
         <!-- Designer — dropdown for admins, pill for viewers -->
-        <td>
+        <td data-val="{{ des.label if des else 'zzz' }}">
           {% if user.role == 'admin' %}
           <div class="inline-assign" data-client-id="{{ client.id }}">
             <select class="des-inline-select"
@@ -188,9 +188,10 @@ function sortTable(col) {
   rows.sort(function(a, b) {
     var aCell = a.cells[col];
     var bCell = b.cells[col];
-    // Use data-val for numeric columns if available
-    var av = aCell.dataset.val !== undefined ? aCell.dataset.val : aCell.textContent.trim().replace(/[$,%\s]/g,'').replace(/,/g,'');
-    var bv = bCell.dataset.val !== undefined ? bCell.dataset.val : bCell.textContent.trim().replace(/[$,%\s]/g,'').replace(/,/g,'');
+    var av = aCell.dataset.val !== undefined ? aCell.dataset.val
+           : aCell.textContent.trim().replace(/[$,%\s]/g,'').replace(/,/g,'');
+    var bv = bCell.dataset.val !== undefined ? bCell.dataset.val
+           : bCell.textContent.trim().replace(/[$,%\s]/g,'').replace(/,/g,'');
     var an = parseFloat(av);
     var bn = parseFloat(bv);
     if (!isNaN(an) && !isNaN(bn)) return dir * (an - bn);

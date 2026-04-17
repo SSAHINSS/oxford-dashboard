@@ -3,7 +3,7 @@
 {% set active_page = "dashboard" %}
 
 {% block head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/static/js/chart.umd.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -198,6 +198,8 @@ function renderLegend() {
 
 var chart = null;
 function buildChart(mode) {
+  if (!DESIGNER_SUMMARY.length) return;
+  if (typeof Chart === 'undefined') { console.warn('Chart.js not loaded'); return; }
   var ctx = document.getElementById('mainChart').getContext('2d');
   if (chart) chart.destroy();
   var labels = DESIGNER_SUMMARY.map(function(d){return d.label;});
