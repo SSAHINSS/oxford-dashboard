@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% block title %}Upload Data — Oxford Design Studio{% endblock %}
+{% set active_page = "upload" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Upload Studio Data</h1>
+    <p class="page-sub">Drop your Studio export to update the dashboard. Known clients are assigned automatically.</p>
+  </div>
+</div>
+
+<!-- Step 1: Drop zone -->
+<div id="step1">
+  <div class="upload-card">
+    <div class="drop-zone" id="dropZone">
+      <input type="file" accept=".xlsx,.xls" id="fileInput">
+      <div class="drop-icon">↑</div>
+      <p class="drop-title">Drop your Studio export here</p>
+      <p class="drop-sub">or <span class="drop-link">click to browse</span> · Excel only (.xlsx)</p>
+    </div>
+    <div id="uploadStatus" class="upload-status" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- Step 2: Review assignments -->
+<div id="step2" style="display:none;">
+  <div class="step-header">
+    <div>
+      <h2 class="step-title">Review Assignments</h2>
+      <p class="step-sub" id="step2Sub"></p>
+    </div>
+    <div class="step-actions">
+      <button class="btn-ghost" onclick="resetUpload()">← Upload different file</button>
+    </div>
+  </div>
+
+  <!-- Period label -->
+  <div class="field-row">
+    <label class="field-label">Period label</label>
+    <input class="field-input" id="periodLabel" type="text" placeholder="e.g. Q3 2024" style="max-width:280px;">
+    <span class="field-hint">Shown in the period selector on the dashboard</span>
+  </div>
+
+  <!-- Needs assignment -->
+  <div id="newClientsBlock" style="display:none;">
+    <div class="assign-block-header warn">
+      <span class="assign-block-title">
+        Needs assignment
+        <span class="badge badge-warn" id="newCount">0</span>
+      </span>
+      <span class="assign-block-hint">These clients are new — select a designer for each.</span>
+    </div>
+    <div id="newClientRows" class="assign-rows-wrap"></div>
+  </div>
+
+  <!-- Auto-assigned -->
+  <div id="autoBlock">
+    <div class="assign-block-header ok" onclick="toggleAutoBlock()">
+      <span class="assign-block-title">
+        Auto-assigned
+        <span class="badge badge-ok" id="autoCount">0</span>
+      </span>
+      <span class="assign-block-hint toggle-hint">Click to expand / collapse</span>
+    </div>
+    <div id="autoClientRows" class="assign-rows-wrap collapsed"></div>
+  </div>
+
+  <div class="confirm-bar">
+    <button class="btn-primary" id="confirmBtn" onclick="confirmAssignments()" disabled>
+      Save &amp; Generate Dashboard →
+    </button>
+    <span class="confirm-hint" id="confirmHint"></span>
+  </div>
+</div>
+
+<!-- Duplicate warning modal -->
+<div id="dupModal" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <h3 class="modal-title">Duplicate upload detected</h3>
+    <p class="modal-body" id="dupMsg"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeDupModal()">Cancel</button>
+      <a id="dupLink" class="btn-primary" href="#">View existing period →</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var parsedData = null;
+var assignments = {};  // name_normalized → designer_id
+
+// ── Designers from server ──
+var DESIGNERS = [
+  {% for d in designers %}
+  { id: {{ d.id }}, name: "{{ d.name }}", label: "{{ d.label }}", color: "{{ d.color_hex }}" }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+function desOptions(selectedId) {
+  var opts = '<option value="">— Select designer —</option>';
+  DESIGNERS.forEach(function(d) {
+    opts += '<option value="' + d.id + '"' + (d.id === selectedId ? ' selected' : '') + '>' + d.label + '</option>';
+  });
+  opts += '<option value="__new__">+ Add new designer / team…</option>';
+  return opts;
+}
+
+// ── Drop zone ──
+var dz = document.getElementById('dropZone');
+var fi = document.getElementById('fileInput');
+dz.addEventListener('dragover',  function(e) { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', function()  { dz.classList.remove('drag-over'); });
+dz.addEventListener('drop', function(e) {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+});
+fi.addEventListener('change', function() { if (fi.files[0]) uploadFile(fi.files[0]); });
+dz.addEventListener('click', function(e) { if (e.target !== fi) fi.click(); });
+
+function showStatus(msg, type) {
+  var el = document.getElementById('uploadStatus');
+  el.style.display = 'block';
+  el.className = 'upload-status status-' + (type || 'info');
+  el.textContent = msg;
+}
+
+function uploadFile(file) {
+  showStatus('Reading ' + file.name + '…', 'info');
+  var fd = new FormData();
+  fd.append('file', file);
+  fetch('/upload/parse', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.duplicate) {
+        showDupModal(data.duplicate_period);
+        return;
+      }
+      parsedData = data;
+      document.getElementById('periodLabel').value = file.name.replace(/\.[^.]+$/, '');
+      renderStep2(data);
+    })
+    .catch(function(err) { showStatus('Error: ' + err.message, 'error'); });
+}
+
+function renderStep2(data) {
+  document.getElementById('step1').style.display = 'none';
+  document.getElementById('step2').style.display = 'block';
+
+  var newClients  = data.clients.filter(function(c) { return !c.designer_id; });
+  var autoClients = data.clients.filter(function(c) { return !!c.designer_id; });
+
+  document.getElementById('step2Sub').textContent =
+    data.clients.length + ' clients from ' + data.filename +
+    ' · ' + autoClients.length + ' auto-assigned · ' + newClients.length + ' need assignment';
+  document.getElementById('newCount').textContent  = newClients.length;
+  document.getElementById('autoCount').textContent = autoClients.length;
+
+  // Seed assignments map
+  data.clients.forEach(function(c) {
+    assignments[c.name_normalized] = c.designer_id || null;
+  });
+
+  // New clients
+  var newBlock = document.getElementById('newClientsBlock');
+  if (newClients.length > 0) {
+    newBlock.style.display = 'block';
+    document.getElementById('newClientRows').innerHTML = newClients.map(function(c) {
+      return renderAssignRow(c, false);
+    }).join('');
+  } else {
+    newBlock.style.display = 'none';
+  }
+
+  // Auto-assigned
+  document.getElementById('autoClientRows').innerHTML = autoClients.map(function(c) {
+    return renderAssignRow(c, true);
+  }).join('');
+
+  updateConfirmBtn();
+}
+
+function renderAssignRow(c, isAuto) {
+  var des = DESIGNERS.find(function(d) { return d.id === c.designer_id; });
+  var colorStyle = des ? 'background:' + des.color + '22;color:' + des.color + ';border:1px solid ' + des.color + '44;' : '';
+  return '<div class="assign-row" id="arow-' + CSS.escape(c.name_normalized) + '">' +
+    '<div class="assign-row-left">' +
+      '<div class="assign-client-name">' + c.name + '</div>' +
+      '<div class="assign-client-meta">' +
+        '$' + Math.round(c.revenue / 1000) + 'K revenue · ' +
+        c.margin.toFixed(1) + '% margin' +
+      '</div>' +
+    '</div>' +
+    '<div class="assign-row-right">' +
+      (isAuto
+        ? '<span class="des-pill" style="' + colorStyle + '">' + (des ? des.label : '') + '</span>' +
+          '<button class="btn-change" data-norm="' + c.name_normalized + '" onclick="switchToSelect(this)">Change</button>'
+        : '<select class="des-select warn" data-norm="' + c.name_normalized + '" onchange="onSelectChange(this)">' +
+            desOptions(c.designer_id) + '</select>'
+      ) +
+    '</div>' +
+  '</div>';
+}
+
+function onSelectChange(sel) {
+  var norm = sel.dataset.norm;
+  if (sel.value === '__new__') {
+    promptNewDesigner(sel, norm);
+    return;
+  }
+  assignments[norm] = sel.value ? parseInt(sel.value) : null;
+  sel.classList.toggle('warn', !sel.value);
+  updateConfirmBtn();
+}
+
+function switchToSelect(btn) {
+  var norm = btn.dataset.norm;
+  var row  = document.getElementById('arow-' + CSS.escape(norm));
+  var right = row.querySelector('.assign-row-right');
+  right.innerHTML = '<select class="des-select" data-norm="' + norm + '" onchange="onSelectChange(this)">' +
+    desOptions(assignments[norm]) + '</select>';
+  assignments[norm] = null;
+  updateConfirmBtn();
+}
+
+function promptNewDesigner(sel, norm) {
+  var row   = document.getElementById('arow-' + CSS.escape(norm));
+  var right = row.querySelector('.assign-row-right');
+  right.innerHTML =
+    '<input id="ndi-' + norm + '" class="field-input" type="text" placeholder="Designer / team name" style="width:200px;" />' +
+    '<input id="ndc-' + norm + '" type="color" value="#888888" style="width:36px;height:36px;border:none;cursor:pointer;background:none;" />' +
+    '<button class="btn-primary small" onclick="addNewDesigner(\'' + norm.replace(/'/g,"\\'") + '\')">Add</button>' +
+    '<button class="btn-ghost small"  onclick="cancelNewDesigner(\'' + norm.replace(/'/g,"\\'") + '\')">Cancel</button>';
+  document.getElementById('ndi-' + norm).focus();
+}
+
+function addNewDesigner(norm) {
+  var nameEl  = document.getElementById('ndi-' + norm);
+  var colorEl = document.getElementById('ndc-' + norm);
+  var name    = nameEl ? nameEl.value.trim() : '';
+  var color   = colorEl ? colorEl.value : '#888888';
+  if (!name) { alert('Please enter a name.'); return; }
+
+  // POST to server to create designer
+  var fd = new FormData();
+  fd.append('name', name);
+  fd.append('label', name);
+  fd.append('color_hex', color);
+  fetch('/designers/add', { method: 'POST', body: fd, redirect: 'manual' })
+    .then(function(r) {
+      // Fetch updated designer list
+      return fetch('/upload');
+    })
+    .then(function() {
+      // Reload page to pick up new designer — simplest reliable approach
+      alert('Designer "' + name + '" added. Page will reload to update the designer list.');
+      window.location.reload();
+    })
+    .catch(function(err) { alert('Error: ' + err); });
+}
+
+function cancelNewDesigner(norm) {
+  var row   = document.getElementById('arow-' + CSS.escape(norm));
+  var right = row.querySelector('.assign-row-right');
+  var curId = assignments[norm];
+  right.innerHTML = '<select class="des-select warn" data-norm="' + norm + '" onchange="onSelectChange(this)">' +
+    desOptions(curId) + '</select>';
+}
+
+function toggleAutoBlock() {
+  var rows = document.getElementById('autoClientRows');
+  rows.classList.toggle('collapsed');
+}
+
+function updateConfirmBtn() {
+  var unassigned = Object.keys(assignments).filter(function(k) { return !assignments[k]; });
+  var btn  = document.getElementById('confirmBtn');
+  var hint = document.getElementById('confirmHint');
+  btn.disabled = unassigned.length > 0;
+  hint.textContent = unassigned.length > 0
+    ? unassigned.length + ' client' + (unassigned.length > 1 ? 's' : '') + ' still need a designer'
+    : 'All clients assigned — ready to save';
+}
+
+function confirmAssignments() {
+  if (!parsedData) return;
+  var label = document.getElementById('periodLabel').value.trim() || parsedData.filename;
+
+  var assignList = parsedData.clients.map(function(c) {
+    return Object.assign({}, c, { designer_id: assignments[c.name_normalized] || null });
+  });
+
+  var btn = document.getElementById('confirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  fetch('/upload/confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filename:    parsedData.filename,
+      row_count:   parsedData.row_count,
+      label:       label,
+      assignments: assignList
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.success) {
+      window.location.href = '/?period_id=' + data.period_id;
+    } else {
+      alert('Error saving data.');
+      btn.disabled = false;
+      btn.textContent = 'Save & Generate Dashboard →';
+    }
+  });
+}
+
+function resetUpload() {
+  parsedData  = null;
+  assignments = {};
+  document.getElementById('step1').style.display = 'block';
+  document.getElementById('step2').style.display = 'none';
+  document.getElementById('uploadStatus').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+}
+
+function showDupModal(period) {
+  document.getElementById('dupMsg').textContent =
+    'This file was already uploaded as "' + period.label + '" on ' + period.uploaded_at + '.';
+  document.getElementById('dupLink').href = '/?period_id=' + period.id;
+  document.getElementById('dupModal').style.display = 'flex';
+}
+function closeDupModal() {
+  document.getElementById('dupModal').style.display = 'none';
+  resetUpload();
+}
+</script>
+{% endblock %}

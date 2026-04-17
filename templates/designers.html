@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Designers — Oxford Design Studio{% endblock %}
+{% set active_page = "designers" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Designers &amp; Teams</h1>
+    <p class="page-sub">Manage the designer roster. Deactivated designers are hidden from new assignments but retained in historical data.</p>
+  </div>
+</div>
+
+<div class="two-col">
+  <!-- Current designers -->
+  <div>
+    <h2 class="section-title">Current roster</h2>
+    <div class="designer-list" id="designerList">
+      {% for d in designers %}
+      <div class="designer-item {% if not d.active %}inactive{% endif %}">
+        <div class="designer-swatch" style="background:{{ d.color_hex }};"></div>
+        <div class="designer-info">
+          <div class="designer-name">{{ d.label }}</div>
+          <div class="designer-slug">{{ d.name }}</div>
+        </div>
+        <div class="designer-actions">
+          <button class="btn-ghost small" onclick="openEdit({{ d.id }}, '{{ d.label }}', '{{ d.color_hex }}')">Edit</button>
+          <form method="post" action="/designers/{{ d.id }}/toggle" style="display:inline;">
+            <button class="btn-ghost small">{{ 'Reactivate' if not d.active else 'Deactivate' }}</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Add new -->
+  <div>
+    <h2 class="section-title">Add designer / team</h2>
+    <div class="form-card">
+      <div id="addAlert" style="display:none;"></div>
+      <div class="field">
+        <label class="field-label">Internal name <span class="field-hint">(for matching, e.g. "Sarah/Tom")</span></label>
+        <input class="field-input" type="text" id="addName" placeholder="Sarah/Tom">
+      </div>
+      <div class="field">
+        <label class="field-label">Display label <span class="field-hint">(shown on dashboard)</span></label>
+        <input class="field-input" type="text" id="addLabel" placeholder="Sarah / Tom">
+      </div>
+      <div class="field">
+        <label class="field-label">Colour</label>
+        <input type="color" id="addColor" value="#5b7fa6" style="width:48px;height:36px;border:1px solid var(--border);cursor:pointer;border-radius:2px;">
+      </div>
+      <button class="btn-primary" onclick="submitAddDesigner()">Add Designer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div id="editModal" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <h3 class="modal-title">Edit designer</h3>
+    <form method="post" id="editForm">
+      <div class="field">
+        <label class="field-label">Display label</label>
+        <input class="field-input" type="text" name="label" id="editLabel" required>
+      </div>
+      <div class="field">
+        <label class="field-label">Colour</label>
+        <input type="color" name="color_hex" id="editColor" style="width:48px;height:36px;border:1px solid var(--border);cursor:pointer;border-radius:2px;">
+      </div>
+      <div class="modal-actions" style="margin-top:20px;">
+        <button type="button" class="btn-ghost" onclick="closeEdit()">Cancel</button>
+        <button type="submit" class="btn-primary">Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function submitAddDesigner() {
+  var name  = document.getElementById('addName').value.trim();
+  var label = document.getElementById('addLabel').value.trim();
+  var color = document.getElementById('addColor').value;
+  var alert = document.getElementById('addAlert');
+
+  if (!name || !label) {
+    alert.style.display = 'block';
+    alert.className = 'alert alert-error';
+    alert.textContent = 'Please fill in both name and label.';
+    return;
+  }
+
+  var fd = new FormData();
+  fd.append('name', name);
+  fd.append('label', label);
+  fd.append('color_hex', color);
+
+  fetch('/designers/add', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.existed) {
+        alert.style.display = 'block';
+        alert.className = 'alert alert-error';
+        alert.textContent = 'A designer with that internal name already exists.';
+      } else {
+        // Reload to show updated list
+        window.location.reload();
+      }
+    })
+    .catch(function(err) {
+      alert.style.display = 'block';
+      alert.className = 'alert alert-error';
+      alert.textContent = 'Error: ' + err.message;
+    });
+}
+
+function openEdit(id, label, color) {
+  document.getElementById('editForm').action = '/designers/' + id + '/edit';
+  document.getElementById('editLabel').value = label;
+  document.getElementById('editColor').value = color;
+  document.getElementById('editModal').style.display = 'flex';
+}
+function closeEdit() {
+  document.getElementById('editModal').style.display = 'none';
+}
+</script>
+{% endblock %}

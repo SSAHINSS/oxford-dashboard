@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Oxford Design Studio{% endblock %}
+{% set active_page = "dashboard" %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="dash-topbar">
+  <div class="dash-topbar-left">
+    {% if periods %}
+    <select class="period-select" onchange="window.location='/?period_id='+this.value">
+      {% for p in periods %}
+      <option value="{{ p.id }}" {% if selected_period and selected_period.id == p.id %}selected{% endif %}>
+        {{ p.label }}
+      </option>
+      {% endfor %}
+    </select>
+    {% endif %}
+    {% if selected_period %}
+    <span class="period-meta">{{ selected_period.uploaded_at.strftime('%b %d, %Y') }}</span>
+    {% endif %}
+  </div>
+  {% if user.role == 'admin' %}
+  <a href="/upload" class="btn-upload">↑ Load New Data</a>
+  {% endif %}
+</div>
+
+{% if not selected_period %}
+<div class="empty-state">
+  <h2 class="empty-title">No data yet</h2>
+  <p class="empty-sub">Upload a Studio export to get started.</p>
+  {% if user.role == 'admin' %}
+  <a href="/upload" class="btn-primary">Upload Studio Export →</a>
+  {% endif %}
+</div>
+{% else %}
+
+<!-- KPIs -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- Designer panels -->
+<section>
+  <div class="section-header"><span class="section-label">Designer Performance</span><div class="section-line"></div></div>
+  <div class="designer-grid">
+    <div class="panel">
+      <p class="panel-title">Revenue by designer</p>
+      <div id="revBars" class="des-bars"></div>
+    </div>
+    <div class="panel">
+      <p class="panel-title">Profit margin %</p>
+      <div id="marginBars" class="des-bars"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Chart -->
+<section>
+  <div class="section-header"><span class="section-label">Comparative View</span><div class="section-line"></div></div>
+  <div class="chart-wrap">
+    <div class="legend-row" id="chartLegend"></div>
+    <div class="chart-tabs">
+      <button class="tab-btn active" onclick="switchChart('profit',this)">Total Profit</button>
+      <button class="tab-btn" onclick="switchChart('revenue',this)">Revenue</button>
+      <button class="tab-btn" onclick="switchChart('margin',this)">Margin %</button>
+      <button class="tab-btn" onclick="switchChart('timebilling',this)">Time Billing</button>
+    </div>
+    <div style="position:relative;height:260px;">
+      <canvas id="mainChart"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- Table -->
+<section class="table-section">
+  <div class="section-header"><span class="section-label">Project Breakdown</span><div class="section-line"></div></div>
+  <div class="toolbar">
+    <div class="tool-group">
+      <span class="tg-label">Designer</span>
+      <div class="btn-row" id="desFiltRow">
+        <button class="f-btn on" onclick="setDesFilter('All',this)">All</button>
+      </div>
+    </div>
+    <div class="tool-group">
+      <span class="tg-label">Margin</span>
+      <div class="btn-row" id="margRow">
+        <button class="f-btn on" onclick="setFilt('margin','all',this,'#margRow')">All</button>
+        <button class="f-btn"    onclick="setFilt('margin','high',this,'#margRow')">&gt;50%</button>
+        <button class="f-btn"    onclick="setFilt('margin','mid',this,'#margRow')">30–50%</button>
+        <button class="f-btn"    onclick="setFilt('margin','low',this,'#margRow')">&lt;30%</button>
+      </div>
+    </div>
+    <div class="tool-group">
+      <span class="tg-label">Revenue</span>
+      <div class="btn-row" id="revRow">
+        <button class="f-btn on" onclick="setFilt('rev','all',this,'#revRow')">All</button>
+        <button class="f-btn"    onclick="setFilt('rev','large',this,'#revRow')">&gt;$500K</button>
+        <button class="f-btn"    onclick="setFilt('rev','mid',this,'#revRow')">$100K–500K</button>
+        <button class="f-btn"    onclick="setFilt('rev','small',this,'#revRow')">&lt;$100K</button>
+      </div>
+    </div>
+    <div class="tool-group">
+      <span class="tg-label">Search</span>
+      <input class="search-box" type="text" placeholder="Client name…" oninput="doSearch(this.value)">
+    </div>
+  </div>
+  <div class="toolbar" style="margin-top:-6px;margin-bottom:12px;">
+    <div class="tool-group">
+      <span class="tg-label">Sort by</span>
+      <div class="btn-row">
+        <button class="s-btn" onclick="setSort('client',this)">Client <span class="s-arrow" id="sa-client"></span></button>
+        <button class="s-btn" onclick="setSort('revenue',this)">Revenue <span class="s-arrow" id="sa-revenue"></span></button>
+        <button class="s-btn on" onclick="setSort('profit',this)">Profit <span class="s-arrow" id="sa-profit">↓</span></button>
+        <button class="s-btn" onclick="setSort('margin',this)">Margin % <span class="s-arrow" id="sa-margin"></span></button>
+        <button class="s-btn" onclick="setSort('time_billing',this)">Time Billing <span class="s-arrow" id="sa-time_billing"></span></button>
+      </div>
+    </div>
+  </div>
+  <p class="result-count" id="resultCount"></p>
+  <div class="table-wrap">
+    <table class="project-table">
+      <thead><tr>
+        <th>Client</th><th>Designer</th>
+        <th class="r">Revenue</th><th class="r">Profit</th>
+        <th class="r">Time Billing</th><th class="r">Margin %</th>
+      </tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+var ALL_PROJECTS      = {{ projects | safe }};
+var DESIGNER_SUMMARY  = {{ designer_summary | safe }};
+
+function fmt(n) {
+  if (!n || n === 0) return '—';
+  if (n >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return '$' + Math.round(n/1e3) + 'K';
+  return '$' + Math.round(n);
+}
+
+if (ALL_PROJECTS.length) {
+  renderKPIs();
+  renderDesignerBars();
+  renderLegend();
+  buildChart('profit');
+  renderTable();
+  buildDesFilterBtns();
+}
+
+function renderKPIs() {
+  var totalRev    = ALL_PROJECTS.reduce(function(s,p){return s+p.revenue;},0);
+  var totalProfit = ALL_PROJECTS.reduce(function(s,p){return s+p.profit;},0);
+  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100).toFixed(1) : 0;
+  var totalTB     = ALL_PROJECTS.reduce(function(s,p){return s+p.time_billing;},0);
+  document.getElementById('kpiGrid').innerHTML =
+    kpi('Total Revenue',  fmt(totalRev),    'All designers combined') +
+    kpi('Total Profit',   fmt(totalProfit), 'Selling + other profit', true) +
+    kpi('Overall Margin', totalMargin + '%','Blended profit rate') +
+    kpi('Time Billing',   fmt(totalTB),     'Across all designers');
+}
+function kpi(label, value, sub, accent) {
+  return '<div class="kpi-card"><p class="kpi-label">'+label+'</p>' +
+    '<p class="kpi-value'+(accent?' accent':'')+'">'+value+'</p>' +
+    '<p class="kpi-sub">'+sub+'</p></div>';
+}
+
+function renderDesignerBars() {
+  var byRev = DESIGNER_SUMMARY.slice().sort(function(a,b){return b.revenue-a.revenue;});
+  var maxRev = byRev.length ? byRev[0].revenue : 1;
+  document.getElementById('revBars').innerHTML = byRev.map(function(d) {
+    var pct = (d.revenue/maxRev*100).toFixed(0);
+    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color_hex+';"></div></div>' +
+      '<span class="des-num">'+fmt(d.revenue)+'</span></div>';
+  }).join('');
+
+  var byMar = DESIGNER_SUMMARY.slice().sort(function(a,b){return b.margin-a.margin;});
+  var maxMar = byMar.length ? byMar[0].margin : 1;
+  document.getElementById('marginBars').innerHTML = byMar.map(function(d) {
+    var pct = (d.margin/maxMar*100).toFixed(0);
+    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color_hex+';opacity:.8;"></div></div>' +
+      '<span class="des-pct" style="color:'+d.color_hex+';">'+d.margin+'%</span></div>';
+  }).join('');
+}
+
+function renderLegend() {
+  document.getElementById('chartLegend').innerHTML = DESIGNER_SUMMARY.map(function(d) {
+    return '<span class="leg-item"><span class="leg-dot" style="background:'+d.color_hex+';"></span>'+d.label+'</span>';
+  }).join('');
+}
+
+var chart = null;
+function buildChart(mode) {
+  var ctx = document.getElementById('mainChart').getContext('2d');
+  if (chart) chart.destroy();
+  var labels = DESIGNER_SUMMARY.map(function(d){return d.label;});
+  var vals   = DESIGNER_SUMMARY.map(function(d){
+    return mode==='profit'?d.profit : mode==='revenue'?d.revenue : mode==='margin'?d.margin : d.time_billing;
+  });
+  var fmtFn = mode==='margin' ? function(v){return v.toFixed(1)+'%';} : function(v){return fmt(v);};
+  chart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: labels,
+      datasets:[{
+        data: vals,
+        backgroundColor: DESIGNER_SUMMARY.map(function(d){return d.color_hex+'cc';}),
+        borderColor:     DESIGNER_SUMMARY.map(function(d){return d.color_hex;}),
+        borderWidth:1, borderRadius:2, borderSkipped:'bottom'
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{label:function(c){return ' '+fmtFn(c.raw);}},
+          backgroundColor:'rgba(28,26,22,0.92)',titleColor:'#a09890',bodyColor:'#f7f4ee',
+          padding:12, cornerRadius:2
+        }
+      },
+      scales:{
+        x:{grid:{display:false},border:{display:false},ticks:{color:'#a09890',font:{size:11}}},
+        y:{grid:{color:'rgba(28,26,22,0.04)'},border:{display:false},
+          ticks:{color:'#a09890',font:{size:11},callback:function(v){return fmtFn(v);}}}
+      }
+    }
+  });
+}
+function switchChart(mode,btn) {
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  buildChart(mode);
+}
+
+// ── Table ──
+var tState = {des:'All',margin:'all',rev:'all',search:'',sort:'profit',dir:-1};
+
+function buildDesFilterBtns() {
+  var row = document.getElementById('desFiltRow');
+  row.innerHTML = '<button class="f-btn on" onclick="setDesFilter(\'All\',this)">All</button>';
+  var seen = {};
+  ALL_PROJECTS.forEach(function(p) {
+    if (!seen[p.designer]) {
+      seen[p.designer] = true;
+      var btn = document.createElement('button');
+      btn.className = 'f-btn';
+      btn.textContent = p.designer_label;
+      btn.onclick = (function(des) { return function() { setDesFilter(des, this); }; })(p.designer);
+      row.appendChild(btn);
+    }
+  });
+}
+
+function renderTable() {
+  var rows = ALL_PROJECTS.filter(function(p) {
+    if (tState.des !== 'All' && p.designer !== tState.des) return false;
+    if (tState.margin === 'high' && p.margin <= 50)  return false;
+    if (tState.margin === 'mid'  && (p.margin < 30 || p.margin > 50)) return false;
+    if (tState.margin === 'low'  && p.margin >= 30)  return false;
+    if (tState.rev === 'large' && p.revenue <= 500000) return false;
+    if (tState.rev === 'mid'   && (p.revenue < 100000 || p.revenue > 500000)) return false;
+    if (tState.rev === 'small' && p.revenue >= 100000) return false;
+    if (tState.search && p.client.toLowerCase().indexOf(tState.search) < 0) return false;
+    return true;
+  });
+  rows.sort(function(a,b) {
+    var av = tState.sort === 'client' ? a.client : a[tState.sort];
+    var bv = tState.sort === 'client' ? b.client : b[tState.sort];
+    return typeof av === 'string' ? tState.dir*av.localeCompare(bv) : tState.dir*(av-bv);
+  });
+  document.getElementById('resultCount').textContent =
+    'Showing ' + rows.length + ' of ' + ALL_PROJECTS.length + ' projects';
+  var body = document.getElementById('tableBody');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="6" class="tbl-empty">No projects match the current filters.</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(function(p) {
+    var bw = Math.max(0, Math.min(100, p.margin));
+    return '<tr>' +
+      '<td><div class="c-name">' + p.client + '</div></td>' +
+      '<td><span class="des-pill" style="background:' + p.color_hex + '22;color:' + p.color_hex + ';border:1px solid ' + p.color_hex + '44;">' + p.designer_label + '</span></td>' +
+      '<td class="r">' + fmt(p.revenue) + '</td>' +
+      '<td class="r' + (p.profit<0?' neg':'') + '">' + fmt(p.profit) + '</td>' +
+      '<td class="r">' + (p.time_billing>0?fmt(p.time_billing):'—') + '</td>' +
+      '<td class="r"><div class="bar-cell">' +
+        '<div class="mini-bar"><div class="mini-fill" style="width:'+bw+'%;background:'+p.color_hex+';"></div></div>' +
+        '<span class="pct-num'+(p.margin<0?' neg':'')+'" style="color:'+(p.margin>60?p.color_hex:'')+'">' + p.margin.toFixed(1) + '%</span>' +
+      '</div></td></tr>';
+  }).join('');
+}
+
+function activateBtn(btn, rowId, color) {
+  document.querySelectorAll(rowId + ' .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
+  btn.classList.add('on'); btn.style.background=color; btn.style.borderColor=color; btn.style.color='white';
+}
+function setDesFilter(val,btn) { tState.des=val; activateBtn(btn,'#desFiltRow',val==='All'?'#1c1a16':'#1c1a16'); renderTable(); }
+function setFilt(type,val,btn,rowId) { tState[type]=val; activateBtn(btn,rowId,'#1c1a16'); renderTable(); }
+function doSearch(v) { tState.search=v.toLowerCase(); renderTable(); }
+function setSort(key,btn) {
+  tState.dir = tState.sort===key ? tState.dir*-1 : (key==='client'?1:-1);
+  tState.sort = key;
+  document.querySelectorAll('.s-btn').forEach(function(b){b.classList.remove('on');});
+  document.querySelectorAll('[id^="sa-"]').forEach(function(e){e.textContent='';});
+  if(btn) btn.classList.add('on');
+  var el = document.getElementById('sa-'+key);
+  if(el) el.textContent = tState.dir===-1?'↓':'↑';
+  renderTable();
+}
+</script>
+{% endblock %}

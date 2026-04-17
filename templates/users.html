@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Users — Oxford Design Studio{% endblock %}
+{% set active_page = "users" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">User Management</h1>
+    <p class="page-sub">Admins can upload data and manage settings. Viewers can browse and filter the dashboard.</p>
+  </div>
+</div>
+
+<div class="two-col">
+  <div>
+    <h2 class="section-title">Current users</h2>
+    <div class="designer-list">
+      {% for u in users %}
+      <div class="designer-item">
+        <div class="designer-info">
+          <div class="designer-name">{{ u.email }}</div>
+          <div class="designer-slug">{{ u.role }} · joined {{ u.created_at.strftime('%b %Y') }}</div>
+        </div>
+        <div class="designer-actions">
+          <span class="nav-role role-{{ u.role }}">{{ u.role }}</span>
+          {% if u.id != user.id %}
+          <form method="post" action="/users/{{ u.id }}/delete" style="display:inline;"
+                onsubmit="return confirm('Delete {{ u.email }}?')">
+            <button class="btn-ghost small">Remove</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div>
+    <h2 class="section-title">Add user</h2>
+    <form method="post" action="/users/add" class="form-card">
+      <div class="field">
+        <label class="field-label">Email</label>
+        <input class="field-input" type="email" name="email" required autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="field-label">Password</label>
+        <input class="field-input" type="password" name="password" required autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label class="field-label">Role</label>
+        <select class="field-input" name="role">
+          <option value="viewer">Viewer — read only</option>
+          <option value="admin">Admin — can upload &amp; manage</option>
+        </select>
+      </div>
+      <button class="btn-primary" type="submit">Add User</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
