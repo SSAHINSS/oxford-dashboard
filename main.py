@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, outerjoin
 from sqlalchemy import desc, func
 
 from database import (
-    get_db, create_tables,
+    SessionLocal, get_db, create_tables,
     User, Designer, Client, Period, Project
 )
 from auth import (
@@ -30,9 +30,39 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+# Client names that should never appear (Studio report summary rows)
+BAD_CLIENT_NAMES = [
+    'report total:', 'report total', 'client office expense',
+    'grand total', 'total'
+]
+
+def is_bad_client(name: str) -> bool:
+    n = name.strip().lower()
+    return n in BAD_CLIENT_NAMES or n.startswith('report')
+
+
 @app.on_event("startup")
 def startup():
     create_tables()
+    # Clean up any bad clients that slipped in from previous uploads
+    db = SessionLocal()
+    try:
+        all_clients = db.query(Client).all()
+        removed = 0
+        for c in all_clients:
+            if is_bad_client(c.name):
+                # Remove associated projects first
+                db.query(Project).filter(Project.client_id == c.id).delete()
+                db.delete(c)
+                removed += 1
+        if removed:
+            db.commit()
+            print(f"Startup cleanup: removed {removed} bad client(s)")
+    except Exception as e:
+        print(f"Startup cleanup error: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 # ── Auth redirect handlers ───────────────────────────────────────────
