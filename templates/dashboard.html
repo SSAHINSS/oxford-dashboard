@@ -136,6 +136,7 @@
 <script>
 var ALL_PROJECTS      = {{ projects | safe }};
 var DESIGNER_SUMMARY  = {{ designer_summary | safe }};
+var tState = {des:'All', margin:'all', rev:'all', search:'', sort:'profit', dir:-1};
 
 function fmt(n) {
   if (!n || n === 0) return '—';
@@ -243,7 +244,6 @@ function switchChart(mode,btn) {
 }
 
 // ── Table ──
-var tState = {des:'All',margin:'all',rev:'all',search:'',sort:'profit',dir:-1};
 
 function buildDesFilterBtns() {
   var row = document.getElementById('desFiltRow');
