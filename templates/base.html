@@ -16,7 +16,8 @@
     <span class="nav-firm">Oxford Design Studio</span>
   </div>
   <div class="nav-links">
-    <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+    <a href="/"        class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+    <a href="/clients" class="nav-link {% if active_page == 'clients'   %}active{% endif %}">Clients</a>
     {% if user.role == 'admin' %}
     <a href="/upload"    class="nav-link {% if active_page == 'upload'    %}active{% endif %}">Upload Data</a>
     <a href="/designers" class="nav-link {% if active_page == 'designers' %}active{% endif %}">Designers</a>

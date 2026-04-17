@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} — Oxford Design Studio{% endblock %}
+{% set active_page = "clients" %}
+
+{% block content %}
+
+<!-- Back link -->
+<a href="/clients" class="btn-ghost" style="margin-bottom:24px;display:inline-block;">← All Clients</a>
+
+<!-- Client header -->
+<div class="client-detail-header">
+  <div>
+    <h1 class="page-title">{{ client.name }}</h1>
+    <p class="page-sub">
+      {% if client.designer %}
+      Currently assigned to
+      <span class="des-pill" style="background:{{ client.designer.color_hex }}22;color:{{ client.designer.color_hex }};border:1px solid {{ client.designer.color_hex }}44;vertical-align:middle;">
+        {{ client.designer.label }}
+      </span>
+      {% else %}
+      <span class="des-pill unassigned-pill">No designer assigned</span>
+      {% endif %}
+    </p>
+  </div>
+  {% if user.role == 'admin' %}
+  <button class="btn-upload" onclick="document.getElementById('assignPanel').classList.toggle('open')">
+    ✎ Change Designer
+  </button>
+  {% endif %}
+</div>
+
+<!-- Assign panel (admin only) -->
+{% if user.role == 'admin' %}
+<div id="assignPanel" class="assign-panel">
+  <form method="post" action="/clients/{{ client.id }}/assign" class="assign-panel-form">
+    <label class="field-label">Assign designer</label>
+    <select name="designer_id" class="field-input" style="max-width:280px;">
+      <option value="0">— Unassigned —</option>
+      {% for d in designers %}
+      <option value="{{ d.id }}" {% if client.designer and client.designer.id == d.id %}selected{% endif %}>
+        {{ d.label }}
+      </option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn-primary" style="margin-left:12px;">Save</button>
+    <span class="field-hint" style="margin-left:8px;">Changes apply to all periods for this client.</span>
+  </form>
+</div>
+{% endif %}
+
+<!-- Lifetime KPIs -->
+<div class="kpi-grid" style="margin-top:32px;">
+  <div class="kpi-card">
+    <p class="kpi-label">Lifetime Revenue</p>
+    <p class="kpi-value">${{ "{:,.0f}".format(total_rev) }}</p>
+    <p class="kpi-sub">Across {{ period_data | length }} period(s)</p>
+  </div>
+  <div class="kpi-card">
+    <p class="kpi-label">Lifetime Profit</p>
+    <p class="kpi-value accent">${{ "{:,.0f}".format(total_profit) }}</p>
+    <p class="kpi-sub">All periods combined</p>
+  </div>
+  <div class="kpi-card">
+    <p class="kpi-label">Avg Margin</p>
+    <p class="kpi-value">{{ avg_margin }}%</p>
+    <p class="kpi-sub">Blended across all periods</p>
+  </div>
+  <div class="kpi-card">
+    <p class="kpi-label">Time Billing</p>
+    <p class="kpi-value">${{ "{:,.0f}".format(total_tb) }}</p>
+    <p class="kpi-sub">Total time billing</p>
+  </div>
+</div>
+
+<!-- Period history -->
+<section style="margin-top:40px;">
+  <div class="section-header">
+    <span class="section-label">Period History</span>
+    <div class="section-line"></div>
+  </div>
+
+  {% if period_data %}
+  <div class="table-wrap">
+    <table class="project-table">
+      <thead><tr>
+        <th>Period</th>
+        <th>Date</th>
+        <th class="r">Revenue</th>
+        <th class="r">Profit</th>
+        <th class="r">Time Billing</th>
+        <th class="r">Margin %</th>
+      </tr></thead>
+      <tbody>
+        {% for p in period_data %}
+        <tr>
+          <td><a href="/?period_id={{ p.period_id }}" class="c-link">{{ p.period_label }}</a></td>
+          <td style="color:var(--ink-xlight);font-size:12px;">{{ p.period_date }}</td>
+          <td class="r">${{ "{:,.0f}".format(p.revenue) }}</td>
+          <td class="r {% if p.profit < 0 %}neg{% endif %}">${{ "{:,.0f}".format(p.profit) }}</td>
+          <td class="r">{% if p.time_billing > 0 %}${{ "{:,.0f}".format(p.time_billing) }}{% else %}—{% endif %}</td>
+          <td class="r">
+            <div class="bar-cell">
+              <div class="mini-bar">
+                <div class="mini-fill" style="width:{{ [p.margin, 100] | min | abs }}%;background:{% if client.designer %}{{ client.designer.color_hex }}{% else %}#aaa{% endif %};"></div>
+              </div>
+              <span class="pct-num {% if p.margin < 0 %}neg{% endif %}">{{ p.margin }}%</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:var(--ink-xlight);font-style:italic;padding:32px 0;">No period data for this client yet.</p>
+  {% endif %}
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.client-detail-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; gap:16px; }
+.assign-panel { display:none; background:white; border:1px solid var(--border); border-radius:2px; padding:20px 24px; margin-bottom:24px; box-shadow:var(--shadow-sm); }
+.assign-panel.open { display:block; }
+.assign-panel-form { display:flex; align-items:center; gap:0; flex-wrap:wrap; gap:8px; }
+.unassigned-pill { background:#f5f5f5; color:#999; border:1px solid #ddd; font-size:11px; padding:3px 10px; border-radius:2px; }
+</style>
+{% endblock %}

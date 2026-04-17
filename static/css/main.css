@@ -325,3 +325,13 @@ body {
   .designer-grid, .two-col { grid-template-columns: 1fr; }
   .nav { padding: 0 16px; }
 }
+
+/* ── CLIENT LIST & DETAIL ── */
+.c-link { text-decoration: none; color: inherit; }
+.c-link:hover .c-name { color: var(--gold); }
+.unassigned-pill { background:#f5f5f5; color:#999; border:1px solid #ddd; font-size:11px; padding:3px 10px; border-radius:2px; }
+.des-pill { font-size:11px; padding:3px 10px; border-radius:2px; white-space:nowrap; display:inline-block; }
+.client-detail-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; gap:16px; }
+.assign-panel { display:none; background:white; border:1px solid var(--border); border-radius:2px; padding:20px 24px; margin-bottom:24px; box-shadow:var(--shadow-sm); }
+.assign-panel.open { display:block; }
+.assign-panel-form { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }

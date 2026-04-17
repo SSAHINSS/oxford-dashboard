@@ -286,7 +286,7 @@ function renderTable() {
   body.innerHTML = rows.map(function(p) {
     var bw = Math.max(0, Math.min(100, p.margin));
     return '<tr>' +
-      '<td><div class="c-name">' + p.client + '</div></td>' +
+      '<td><a href="/clients/' + p.client_id + '" class="c-link"><div class="c-name">' + p.client + '</div></a></td>' +
       '<td><span class="des-pill" style="background:' + p.color_hex + '22;color:' + p.color_hex + ';border:1px solid ' + p.color_hex + '44;">' + p.designer_label + '</span></td>' +
       '<td class="r">' + fmt(p.revenue) + '</td>' +
       '<td class="r' + (p.profit<0?' neg':'') + '">' + fmt(p.profit) + '</td>' +

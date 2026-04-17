@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Clients — Oxford Design Studio{% endblock %}
+{% set active_page = "clients" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Clients</h1>
+    <p class="page-sub">All clients across all periods. Click a client to view their history and reassign designers.</p>
+  </div>
+  <div>
+    <input class="search-box" type="text" placeholder="Search clients…" id="clientSearch" oninput="filterClients(this.value)" style="width:220px;">
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="project-table" id="clientTable">
+    <thead><tr>
+      <th onclick="sortTable(0)">Client <span class="s-arrow" id="th0"></span></th>
+      <th onclick="sortTable(1)">Designer <span class="s-arrow" id="th1"></span></th>
+      <th class="r" onclick="sortTable(2)">Revenue <span class="s-arrow" id="th2"></span></th>
+      <th class="r" onclick="sortTable(3)">Profit <span class="s-arrow" id="th3"></span></th>
+      <th class="r" onclick="sortTable(4)">Margin <span class="s-arrow" id="th4"></span></th>
+      <th class="r" onclick="sortTable(5)">Periods <span class="s-arrow" id="th5"></span></th>
+      <th></th>
+    </tr></thead>
+    <tbody>
+      {% for client in clients %}
+      {% set m = client_metrics[client.id] %}
+      {% set des = client.designer %}
+      <tr class="client-row" data-name="{{ client.name | lower }}">
+        <td><a href="/clients/{{ client.id }}" class="c-link"><div class="c-name">{{ client.name }}</div></a></td>
+        <td>
+          {% if des %}
+          <span class="des-pill" style="background:{{ des.color_hex }}22;color:{{ des.color_hex }};border:1px solid {{ des.color_hex }}44;">
+            {{ des.label }}
+          </span>
+          {% else %}
+          <span class="des-pill unassigned-pill">Unassigned</span>
+          {% endif %}
+        </td>
+        <td class="r">{% if m.revenue > 0 %}${{ "{:,.0f}".format(m.revenue) }}{% else %}—{% endif %}</td>
+        <td class="r">{% if m.profit != 0 %}${{ "{:,.0f}".format(m.profit) }}{% else %}—{% endif %}</td>
+        <td class="r">
+          {% if m.revenue > 0 %}
+          <div class="bar-cell">
+            <div class="mini-bar"><div class="mini-fill" style="width:{{ [m.margin, 100] | min | abs }}%;background:{% if des %}{{ des.color_hex }}{% else %}#aaa{% endif %};"></div></div>
+            <span class="pct-num {% if m.margin < 0 %}neg{% endif %}">{{ m.margin }}%</span>
+          </div>
+          {% else %}—{% endif %}
+        </td>
+        <td class="r">{{ m.periods }}</td>
+        <td>
+          <a href="/clients/{{ client.id }}" class="btn-ghost small">View →</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterClients(val) {
+  var v = val.toLowerCase();
+  document.querySelectorAll('.client-row').forEach(function(row) {
+    row.style.display = row.dataset.name.includes(v) ? '' : 'none';
+  });
+}
+
+var sortDir = {};
+function sortTable(col) {
+  var tbody = document.querySelector('#clientTable tbody');
+  var rows  = Array.from(tbody.querySelectorAll('tr'));
+  var dir   = sortDir[col] === 1 ? -1 : 1;
+  sortDir   = {};
+  sortDir[col] = dir;
+  document.querySelectorAll('[id^="th"]').forEach(function(el) { el.textContent = ''; });
+  document.getElementById('th' + col).textContent = dir === 1 ? '↑' : '↓';
+  rows.sort(function(a, b) {
+    var av = a.cells[col].textContent.trim().replace(/[$,%]/g, '');
+    var bv = b.cells[col].textContent.trim().replace(/[$,%]/g, '');
+    var an = parseFloat(av.replace(/,/g,''));
+    var bn = parseFloat(bv.replace(/,/g,''));
+    if (!isNaN(an) && !isNaN(bn)) return dir * (an - bn);
+    return dir * av.localeCompare(bv);
+  });
+  rows.forEach(function(r) { tbody.appendChild(r); });
+}
+</script>
+{% endblock %}
