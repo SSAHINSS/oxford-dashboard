@@ -175,10 +175,10 @@ def dashboard(
                 "designer":       des.name      if des else "Unassigned",
                 "designer_label": des.label     if des else "Unassigned",
                 "color_hex":      des.color_hex if des else "#aaaaaa",
-                "revenue":        round(p.revenue, 2),
-                "profit":         round(p.profit, 2),
-                "time_billing":   round(p.time_billing, 2),
-                "margin":         round(p.margin, 1),
+                "revenue":        round(float(p.revenue or 0), 2),
+                "profit":         round(float(p.profit or 0), 2),
+                "time_billing":   round(float(p.time_billing or 0), 2),
+                "margin":         round(float(p.margin or 0), 1),
             })
 
         des_map: dict = {}

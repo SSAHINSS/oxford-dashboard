@@ -274,8 +274,8 @@ function renderTable() {
     return true;
   });
   rows.sort(function(a,b) {
-    var av = tState.sort === 'client' ? a.client : a[tState.sort];
-    var bv = tState.sort === 'client' ? b.client : b[tState.sort];
+    var av = tState.sort === 'client' ? a.client : (a[tState.sort] || 0);
+    var bv = tState.sort === 'client' ? b.client : (b[tState.sort] || 0);
     return typeof av === 'string' ? tState.dir*av.localeCompare(bv) : tState.dir*(av-bv);
   });
   document.getElementById('resultCount').textContent =
@@ -285,19 +285,26 @@ function renderTable() {
     body.innerHTML = '<tr><td colspan="6" class="tbl-empty">No projects match the current filters.</td></tr>';
     return;
   }
-  body.innerHTML = rows.map(function(p) {
-    var bw = Math.max(0, Math.min(100, p.margin));
-    return '<tr>' +
-      '<td><a href="/clients/' + p.client_id + '" class="c-link"><div class="c-name">' + p.client + '</div></a></td>' +
-      '<td><span class="des-pill" style="background:' + p.color_hex + '22;color:' + p.color_hex + ';border:1px solid ' + p.color_hex + '44;">' + p.designer_label + '</span></td>' +
-      '<td class="r">' + fmt(p.revenue) + '</td>' +
-      '<td class="r' + (p.profit<0?' neg':'') + '">' + fmt(p.profit) + '</td>' +
-      '<td class="r">' + (p.time_billing>0?fmt(p.time_billing):'—') + '</td>' +
-      '<td class="r"><div class="bar-cell">' +
-        '<div class="mini-bar"><div class="mini-fill" style="width:'+bw+'%;background:'+p.color_hex+';"></div></div>' +
-        '<span class="pct-num'+(p.margin<0?' neg':'')+'" style="color:'+(p.margin>60?p.color_hex:'')+'">' + p.margin.toFixed(1) + '%</span>' +
-      '</div></td></tr>';
-  }).join('');
+  try {
+    body.innerHTML = rows.map(function(p) {
+      var margin = parseFloat(p.margin) || 0;
+      var bw = Math.max(0, Math.min(100, margin));
+      var color = p.color_hex || '#888888';
+      return '<tr>' +
+        '<td><a href="/clients/' + (p.client_id||'') + '" class="c-link"><div class="c-name">' + (p.client||'') + '</div></a></td>' +
+        '<td><span class="des-pill" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '44;">' + (p.designer_label||'—') + '</span></td>' +
+        '<td class="r">' + fmt(p.revenue) + '</td>' +
+        '<td class="r' + (p.profit<0?' neg':'') + '">' + fmt(p.profit) + '</td>' +
+        '<td class="r">' + (p.time_billing>0?fmt(p.time_billing):'—') + '</td>' +
+        '<td class="r"><div class="bar-cell">' +
+          '<div class="mini-bar"><div class="mini-fill" style="width:'+bw+'%;background:'+color+';"></div></div>' +
+          '<span class="pct-num'+(margin<0?' neg':'')+'" style="color:'+(margin>60?color:'')+'">' + margin.toFixed(1) + '%</span>' +
+        '</div></td></tr>';
+    }).join('');
+  } catch(e) {
+    body.innerHTML = '<tr><td colspan="6" class="tbl-empty">Error rendering table: ' + e.message + '</td></tr>';
+    console.error('renderTable error:', e);
+  }
 }
 
 function activateBtn(btn, rowId, color) {
