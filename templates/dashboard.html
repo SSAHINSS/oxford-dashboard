@@ -201,8 +201,11 @@ var chart = null;
 function buildChart(mode) {
   if (!DESIGNER_SUMMARY.length) return;
   if (typeof Chart === 'undefined') { console.warn('Chart.js not loaded'); return; }
+  // Destroy old chart and replace canvas to avoid Chart.js reuse bugs
+  if (chart) { chart.destroy(); chart = null; }
+  var wrap = document.getElementById('mainChart').parentNode;
+  wrap.innerHTML = '<canvas id="mainChart"></canvas>';
   var ctx = document.getElementById('mainChart').getContext('2d');
-  if (chart) chart.destroy();
   var labels = DESIGNER_SUMMARY.map(function(d){return d.label;});
   var vals   = DESIGNER_SUMMARY.map(function(d){
     return mode==='profit'?d.profit : mode==='revenue'?d.revenue : mode==='margin'?d.margin : d.time_billing;
@@ -237,7 +240,7 @@ function buildChart(mode) {
     }
   });
 }
-function switchChart(mode,btn) {
+function switchChart(mode, btn) {
   document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   buildChart(mode);
