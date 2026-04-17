@@ -8,86 +8,96 @@ def norm_name(s: str) -> str:
     return re.sub(r'\s+', ' ', str(s).strip()).upper()
 
 
-def detect_col(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
-    """Find a column by trying candidate names (case-insensitive, then partial)."""
-    cols_lower = {c.strip().lower(): c for c in df.columns}
-    for candidate in candidates:
-        if candidate.lower() in cols_lower:
-            return cols_lower[candidate.lower()]
-    for candidate in candidates:
-        for key, col in cols_lower.items():
-            if candidate.lower() in key:
-                return col
-    return None
+def to_float(val) -> float:
+    try:
+        return float(str(val).replace(',', '').replace('$', '').strip())
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def find_header_row(df: pd.DataFrame) -> int:
+    """Find the row index that contains 'Client' as a column header."""
+    for i, row in df.iterrows():
+        vals = [str(v).strip() for v in row.values]
+        if 'Client' in vals:
+            return i
+    return 0
 
 
 def parse_studio_export(file_bytes: bytes, filename: str) -> dict:
     """
     Parse a Studio ERP Excel export.
-    Returns:
-      {
-        row_count: int,
-        sheet: str,
-        clients: [{ name, name_normalized, revenue, profit, time_billing, margin }]
-      }
+
+    Studio format:
+      - Rows 0-3: title block (studio name, date, blanks)
+      - Row 4:    real headers (Client, Room, Purchase, Selling, ...)
+      - Data:     one row per room per client + subtotal row (Room='')
+                  + blank separator row between clients
+      - TIME BILLING appears as a Room value
     """
     xl = pd.ExcelFile(file_bytes)
     sheet_name = next(
         (s for s in xl.sheet_names if 'PROFIT' in s.upper()),
         xl.sheet_names[0]
     )
-    df = xl.parse(sheet_name, dtype=str)
+
+    # First pass — find real header row
+    raw = xl.parse(sheet_name, dtype=str, header=None)
+    raw = raw.fillna('')
+    header_idx = find_header_row(raw)
+
+    # Second pass — parse with correct header
+    df = xl.parse(sheet_name, dtype=str, skiprows=header_idx, header=0)
     df = df.fillna('')
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].str.strip()
 
     row_count = len(df)
 
-    client_col  = detect_col(df, ['Client', 'client', 'PROJECT', 'project', 'CLIENT'])
-    selling_col = detect_col(df, ['Selling', 'selling', 'Revenue', 'revenue', 'SELLING'])
-    profit_col  = detect_col(df, ['Total Profit', 'TotalProfit', 'total profit', 'Total_Profit', 'Profit'])
-    type_col    = detect_col(df, ['Type', 'type', 'TYPE'])
-
-    if not client_col:
+    if 'Client' not in df.columns:
         raise ValueError(
-            "Could not find a Client column. "
-            "Columns found: " + ", ".join(str(c) for c in df.columns)
+            f"Could not find Client column. Found: {list(df.columns)}"
         )
 
-    def to_float(val) -> float:
-        try:
-            return float(str(val).replace(',', '').replace('$', '').strip())
-        except (ValueError, TypeError):
-            return 0.0
+    selling_col = next((c for c in df.columns if c.strip() == 'Selling'), None)
+    profit_col  = next((c for c in df.columns if c.strip() == 'Total Profit'), None)
+    room_col    = 'Room' if 'Room' in df.columns else None
 
-    client_map = {}
-    for _, row in df.iterrows():
-        client_raw = str(row.get(client_col, '')).strip()
-        if not client_raw:
-            continue
-        norm = norm_name(client_raw)
-        if norm not in client_map:
-            client_map[norm] = {
-                'name': client_raw,
-                'name_normalized': norm,
-                'revenue': 0.0,
-                'profit': 0.0,
-                'time_billing': 0.0,
-            }
+    # Subtotal rows: Client set, Room blank
+    if room_col:
+        subtotals = df[(df['Client'] != '') & (df[room_col] == '')]
+        tb_rows   = df[df[room_col].str.upper() == 'TIME BILLING']
+    else:
+        subtotals = df[df['Client'] != '']
+        tb_rows   = pd.DataFrame()
 
-        selling  = to_float(row.get(selling_col, 0)) if selling_col else 0.0
-        profit   = to_float(row.get(profit_col, 0))  if profit_col  else 0.0
-        row_type = str(row.get(type_col, '')).strip().upper() if type_col else ''
+    # Time billing per client
+    tb_map: dict = {}
+    if not tb_rows.empty and profit_col:
+        for _, row in tb_rows.iterrows():
+            c = row['Client'].strip()
+            if c:
+                tb_map[c] = tb_map.get(c, 0.0) + to_float(row.get(profit_col, 0))
 
-        client_map[norm]['revenue'] += selling
-        client_map[norm]['profit']  += profit
-        if row_type == 'TIME BILLING':
-            client_map[norm]['time_billing'] += profit
-
+    # Build client list
     clients = []
-    for data in client_map.values():
-        rev  = data['revenue']
-        prof = data['profit']
-        data['margin'] = round((prof / rev * 100), 1) if rev else 0.0
-        clients.append(data)
+    for _, row in subtotals.iterrows():
+        name = row['Client'].strip()
+        if not name:
+            continue
+        revenue = to_float(row.get(selling_col, 0)) if selling_col else 0.0
+        profit  = to_float(row.get(profit_col,  0)) if profit_col  else 0.0
+        tb      = tb_map.get(name, 0.0)
+        margin  = round((profit / revenue * 100), 1) if revenue else 0.0
+        clients.append({
+            'name':            name,
+            'name_normalized': norm_name(name),
+            'revenue':         revenue,
+            'profit':          profit,
+            'time_billing':    tb,
+            'margin':          margin,
+        })
 
     clients.sort(key=lambda c: c['name'])
 
