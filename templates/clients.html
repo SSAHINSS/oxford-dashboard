@@ -6,11 +6,12 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Clients</h1>
-    <p class="page-sub">All clients across all periods. Click a client to view their history and reassign designers.</p>
+    <p class="page-sub">{{ clients | length }} clients across all periods.
+      {% if user.role == 'admin' %}Change designers inline — saves instantly.{% endif %}
+    </p>
   </div>
-  <div>
-    <input class="search-box" type="text" placeholder="Search clients…" id="clientSearch" oninput="filterClients(this.value)" style="width:220px;">
-  </div>
+  <input class="search-box" type="text" placeholder="Search clients…"
+         oninput="filterClients(this.value)" style="width:220px;">
 </div>
 
 <div class="table-wrap">
@@ -29,30 +30,64 @@
       {% set m = client_metrics[client.id] %}
       {% set des = client.designer %}
       <tr class="client-row" data-name="{{ client.name | lower }}">
-        <td><a href="/clients/{{ client.id }}" class="c-link"><div class="c-name">{{ client.name }}</div></a></td>
+
+        <!-- Client name -->
         <td>
-          {% if des %}
-          <span class="des-pill" style="background:{{ des.color_hex }}22;color:{{ des.color_hex }};border:1px solid {{ des.color_hex }}44;">
-            {{ des.label }}
-          </span>
+          <a href="/clients/{{ client.id }}" class="c-link">
+            <div class="c-name">{{ client.name }}</div>
+          </a>
+        </td>
+
+        <!-- Designer — dropdown for admins, pill for viewers -->
+        <td>
+          {% if user.role == 'admin' %}
+          <div class="inline-assign" data-client-id="{{ client.id }}">
+            <select class="des-inline-select"
+                    data-client="{{ client.id }}"
+                    data-current="{{ des.id if des else 0 }}"
+                    onchange="saveDesigner(this)">
+              <option value="0" {% if not des %}selected{% endif %}>— Unassigned —</option>
+              {% for d in designers %}
+              <option value="{{ d.id }}"
+                      data-color="{{ d.color_hex }}"
+                      data-label="{{ d.label }}"
+                      {% if des and des.id == d.id %}selected{% endif %}>
+                {{ d.label }}
+              </option>
+              {% endfor %}
+            </select>
+            <span class="save-indicator" id="si-{{ client.id }}"></span>
+          </div>
           {% else %}
-          <span class="des-pill unassigned-pill">Unassigned</span>
+            {% if des %}
+            <span class="des-pill" style="background:{{ des.color_hex }}22;color:{{ des.color_hex }};border:1px solid {{ des.color_hex }}44;">
+              {{ des.label }}
+            </span>
+            {% else %}
+            <span class="des-pill unassigned-pill">Unassigned</span>
+            {% endif %}
           {% endif %}
         </td>
-        <td class="r">{% if m.revenue > 0 %}${{ "{:,.0f}".format(m.revenue) }}{% else %}—{% endif %}</td>
-        <td class="r">{% if m.profit != 0 %}${{ "{:,.0f}".format(m.profit) }}{% else %}—{% endif %}</td>
-        <td class="r">
+
+        <!-- Metrics -->
+        <td class="r" data-val="{{ m.revenue }}">
+          {% if m.revenue > 0 %}${{ "{:,.0f}".format(m.revenue) }}{% else %}—{% endif %}
+        </td>
+        <td class="r" data-val="{{ m.profit }}">
+          {% if m.profit != 0 %}${{ "{:,.0f}".format(m.profit) }}{% else %}—{% endif %}
+        </td>
+        <td class="r" data-val="{{ m.margin }}">
           {% if m.revenue > 0 %}
           <div class="bar-cell">
-            <div class="mini-bar"><div class="mini-fill" style="width:{{ [m.margin, 100] | min | abs }}%;background:{% if des %}{{ des.color_hex }}{% else %}#aaa{% endif %};"></div></div>
+            <div class="mini-bar">
+              <div class="mini-fill" style="width:{{ [m.margin,100]|min|abs }}%;background:{% if des %}{{ des.color_hex }}{% else %}#aaa{% endif %};"></div>
+            </div>
             <span class="pct-num {% if m.margin < 0 %}neg{% endif %}">{{ m.margin }}%</span>
           </div>
           {% else %}—{% endif %}
         </td>
-        <td class="r">{{ m.periods }}</td>
-        <td>
-          <a href="/clients/{{ client.id }}" class="btn-ghost small">View →</a>
-        </td>
+        <td class="r" data-val="{{ m.periods }}">{{ m.periods }}</td>
+        <td><a href="/clients/{{ client.id }}" class="btn-ghost small">View →</a></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -61,7 +96,79 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.des-inline-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+  min-width: 170px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.12s;
+}
+.des-inline-select:focus { border-color: var(--gold); outline: none; }
+.des-inline-select.saving { opacity: 0.5; pointer-events: none; }
+.inline-assign { display: flex; align-items: center; gap: 8px; }
+.save-indicator {
+  font-size: 11px; font-weight: 500;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+.save-indicator.ok   { color: #2e7d32; }
+.save-indicator.err  { color: var(--red); }
+</style>
+
 <script>
+function saveDesigner(sel) {
+  var clientId   = sel.dataset.client;
+  var designerId = sel.value;
+  var indicator  = document.getElementById('si-' + clientId);
+  sel.classList.add('saving');
+  indicator.className = 'save-indicator';
+  indicator.textContent = 'Saving…';
+
+  var fd = new FormData();
+  fd.append('designer_id', designerId);
+  fd.append('ajax', '1');
+
+  fetch('/clients/' + clientId + '/assign', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      sel.classList.remove('saving');
+      if (data.ok) {
+        indicator.className = 'save-indicator ok';
+        indicator.textContent = '✓ Saved';
+        // Update select border color to match designer
+        var opt = sel.options[sel.selectedIndex];
+        var color = opt.dataset.color || '';
+        sel.style.borderColor = color || 'var(--border)';
+        sel.style.color = color || 'var(--ink)';
+        setTimeout(function() { indicator.textContent = ''; }, 2000);
+      } else {
+        indicator.className = 'save-indicator err';
+        indicator.textContent = '✗ Error';
+      }
+    })
+    .catch(function() {
+      sel.classList.remove('saving');
+      indicator.className = 'save-indicator err';
+      indicator.textContent = '✗ Failed';
+    });
+}
+
+// Color the selects on load to match current designer
+document.querySelectorAll('.des-inline-select').forEach(function(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.color) {
+    sel.style.borderColor = opt.dataset.color;
+    sel.style.color = opt.dataset.color;
+  }
+});
+
 function filterClients(val) {
   var v = val.toLowerCase();
   document.querySelectorAll('.client-row').forEach(function(row) {
@@ -72,19 +179,22 @@ function filterClients(val) {
 var sortDir = {};
 function sortTable(col) {
   var tbody = document.querySelector('#clientTable tbody');
-  var rows  = Array.from(tbody.querySelectorAll('tr'));
+  var rows  = Array.from(tbody.querySelectorAll('tr.client-row'));
   var dir   = sortDir[col] === 1 ? -1 : 1;
   sortDir   = {};
   sortDir[col] = dir;
   document.querySelectorAll('[id^="th"]').forEach(function(el) { el.textContent = ''; });
   document.getElementById('th' + col).textContent = dir === 1 ? '↑' : '↓';
   rows.sort(function(a, b) {
-    var av = a.cells[col].textContent.trim().replace(/[$,%]/g, '');
-    var bv = b.cells[col].textContent.trim().replace(/[$,%]/g, '');
-    var an = parseFloat(av.replace(/,/g,''));
-    var bn = parseFloat(bv.replace(/,/g,''));
+    var aCell = a.cells[col];
+    var bCell = b.cells[col];
+    // Use data-val for numeric columns if available
+    var av = aCell.dataset.val !== undefined ? aCell.dataset.val : aCell.textContent.trim().replace(/[$,%\s]/g,'').replace(/,/g,'');
+    var bv = bCell.dataset.val !== undefined ? bCell.dataset.val : bCell.textContent.trim().replace(/[$,%\s]/g,'').replace(/,/g,'');
+    var an = parseFloat(av);
+    var bn = parseFloat(bv);
     if (!isNaN(an) && !isNaN(bn)) return dir * (an - bn);
-    return dir * av.localeCompare(bv);
+    return dir * String(av).localeCompare(String(bv));
   });
   rows.forEach(function(r) { tbody.appendChild(r); });
 }

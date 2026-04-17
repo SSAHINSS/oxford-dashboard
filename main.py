@@ -286,6 +286,7 @@ def client_detail(
 def assign_client_designer(
     client_id:    int,
     designer_id:  int = Form(...),
+    ajax:         int = Form(default=0),
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -294,6 +295,13 @@ def assign_client_designer(
         raise HTTPException(status_code=404)
     client.designer_id = designer_id if designer_id != 0 else None
     db.commit()
+    if ajax:
+        des = db.query(Designer).filter(Designer.id == designer_id).first() if designer_id else None
+        return JSONResponse({
+            "ok": True,
+            "designer_label": des.label     if des else None,
+            "designer_color": des.color_hex if des else None,
+        })
     return RedirectResponse(url=f"/clients/{client_id}", status_code=302)
 
 
