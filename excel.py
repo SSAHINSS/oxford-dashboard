@@ -80,11 +80,16 @@ def parse_studio_export(file_bytes: bytes, filename: str) -> dict:
             if c:
                 tb_map[c] = tb_map.get(c, 0.0) + to_float(row.get(profit_col, 0))
 
+    # Words that indicate a summary/total row, not a real client
+    EXCLUDE = {'REPORT TOTAL:', 'REPORT TOTAL', 'CLIENT OFFICE EXPENSE', 'GRAND TOTAL', 'TOTAL'}
+
     # Build client list
     clients = []
     for _, row in subtotals.iterrows():
         name = row['Client'].strip()
         if not name:
+            continue
+        if norm_name(name) in EXCLUDE or norm_name(name).startswith('REPORT'):
             continue
         revenue = to_float(row.get(selling_col, 0)) if selling_col else 0.0
         profit  = to_float(row.get(profit_col,  0)) if profit_col  else 0.0
