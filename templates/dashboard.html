@@ -70,6 +70,15 @@
   <button class="btn-ghost small" onclick="clearDateFilters()">Clear</button>
 </div>
 
+<!-- Team / Designer filter -->
+<div class="date-filter-bar" id="teamFilterBar" style="display:none;margin-top:-16px;">
+  <div class="date-filter-group" style="flex:1;">
+    <span class="tg-label">Team <span class="tg-hint">click to toggle — filters everything</span></span>
+    <div class="btn-row" id="teamRow"></div>
+  </div>
+  <a href="/designers" class="btn-ghost small" style="align-self:flex-end;">Manage roster →</a>
+</div>
+
 {% if not selected_period %}
 <div class="empty-state">
   <h2 class="empty-title">No data yet</h2>
@@ -79,34 +88,6 @@
 {% else %}
 
 <div class="kpi-grid" id="kpiGrid"></div>
-
-<section>
-  <div class="section-header"><span class="section-label">Designer Performance</span><div class="section-line"></div></div>
-  <div class="designer-grid">
-    <div class="panel">
-      <p class="panel-title">Revenue by designer</p>
-      <div id="revBars" class="des-bars"></div>
-    </div>
-    <div class="panel">
-      <p class="panel-title">Profit margin %</p>
-      <div id="marginBars" class="des-bars"></div>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="section-header"><span class="section-label">Comparative View</span><div class="section-line"></div></div>
-  <div class="chart-wrap">
-    <div class="legend-row" id="chartLegend"></div>
-    <div class="chart-tabs">
-      <button class="tab-btn active" data-mode="profit"       onclick="switchChart('profit',this)">Total Profit</button>
-      <button class="tab-btn"        data-mode="revenue"      onclick="switchChart('revenue',this)">Revenue</button>
-      <button class="tab-btn"        data-mode="margin"       onclick="switchChart('margin',this)">Margin %</button>
-      <button class="tab-btn"        data-mode="time_billing" onclick="switchChart('time_billing',this)">Time Billing</button>
-    </div>
-    <div class="chart-canvas-wrap"><canvas id="mainChart"></canvas></div>
-  </div>
-</section>
 
 <section style="margin-bottom:56px;">
   <div class="section-header"><span class="section-label">Period Comparison</span><div class="section-line"></div></div>
@@ -136,6 +117,34 @@
   <div class="chart-wrap" style="min-height:380px;">
     <div class="chart-canvas-wrap" style="height:340px;"><canvas id="compareChart"></canvas></div>
     <div class="legend-row" id="compareLegend" style="margin-top:18px;justify-content:center;"></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-header"><span class="section-label">Designer Performance</span><div class="section-line"></div></div>
+  <div class="designer-grid">
+    <div class="panel">
+      <p class="panel-title">Revenue by designer</p>
+      <div id="revBars" class="des-bars"></div>
+    </div>
+    <div class="panel">
+      <p class="panel-title">Profit margin %</p>
+      <div id="marginBars" class="des-bars"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-header"><span class="section-label">Comparative View</span><div class="section-line"></div></div>
+  <div class="chart-wrap">
+    <div class="legend-row" id="chartLegend"></div>
+    <div class="chart-tabs">
+      <button class="tab-btn active" data-mode="profit"       onclick="switchChart('profit',this)">Total Profit</button>
+      <button class="tab-btn"        data-mode="revenue"      onclick="switchChart('revenue',this)">Revenue</button>
+      <button class="tab-btn"        data-mode="margin"       onclick="switchChart('margin',this)">Margin %</button>
+      <button class="tab-btn"        data-mode="time_billing" onclick="switchChart('time_billing',this)">Time Billing</button>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="mainChart"></canvas></div>
   </div>
 </section>
 
@@ -205,7 +214,7 @@
 var ALL_PROJECTS = {{ projects | safe }};
 
 // Filter state
-var dState = { year: 'all', months: [] };
+var dState = { year: 'all', months: [], designers: [] };
 
 // Table state
 var tState = { des:'All', margin:'all', rev:'all', search:'', sort:'profit', dir:-1 };
@@ -239,14 +248,22 @@ function monthName(mm) {
 // DATA: filter + aggregate
 // ═══════════════════════════════════════════════════════
 
-function filterByDate(projects) {
-  var noFilter = dState.year === 'all' && dState.months.length === 0;
-  if (noFilter) return projects;
+function filterProjects(projects) {
+  // 1) Designer filter (empty array = all designers)
+  var filtered = projects;
+  if (dState.designers.length > 0) {
+    filtered = projects.filter(function(p) {
+      return dState.designers.indexOf(p.designer) >= 0;
+    });
+  }
+  // 2) Date filter
+  var noDate = dState.year === 'all' && dState.months.length === 0;
+  if (noDate) return filtered;
   var hasYear = dState.year !== 'all';
   var hasMonths = dState.months.length > 0;
   var out = [];
-  for (var i = 0; i < projects.length; i++) {
-    var p = projects[i];
+  for (var i = 0; i < filtered.length; i++) {
+    var p = filtered[i];
     var md = p.monthly_data || {};
     var rev = 0, prof = 0, tb = 0, hit = false;
     var keys = Object.keys(md);
@@ -267,27 +284,36 @@ function filterByDate(projects) {
   return out;
 }
 
+// Kept for backward compatibility with any code still calling it
+function filterByDate(projects) { return filterProjects(projects); }
+
 // ═══════════════════════════════════════════════════════
 // KPI CARDS (always dynamic)
 // ═══════════════════════════════════════════════════════
 
 function filterLabel() {
-  if (dState.year === 'all' && dState.months.length === 0) return 'All periods';
   var parts = [];
   if (dState.months.length > 0) {
     var ms = dState.months.slice().sort();
     parts.push(ms.length <= 3 ? ms.map(monthName).join(', ') : ms.length + ' months');
   }
-  parts.push(dState.year === 'all' ? 'All years' : dState.year);
+  if (dState.year !== 'all') parts.push(dState.year);
+  if (dState.designers.length > 0) {
+    parts.push(dState.designers.length === 1 ? dState.designers[0] : dState.designers.length + ' team members');
+  }
+  if (!parts.length) return 'Company · All periods';
   return parts.join(' · ');
 }
 
 function kpiMonthlySeries() {
   // Returns arrays of values per month (in order) within the current filter scope
   var hasMonths = dState.months.length > 0;
+  var hasDes    = dState.designers.length > 0;
   var byMonth = {};
   for (var i = 0; i < ALL_PROJECTS.length; i++) {
-    var md = ALL_PROJECTS[i].monthly_data || {};
+    var p = ALL_PROJECTS[i];
+    if (hasDes && dState.designers.indexOf(p.designer) < 0) continue;
+    var md = p.monthly_data || {};
     var keys = Object.keys(md);
     for (var j = 0; j < keys.length; j++) {
       var k = keys[j];
@@ -316,11 +342,14 @@ function kpiPriorYearDelta() {
   // Compute YoY deltas if a specific year is selected
   if (dState.year === 'all') return null;
   var hasMonths = dState.months.length > 0;
+  var hasDes    = dState.designers.length > 0;
   var priorYear = String(parseInt(dState.year) - 1);
   var cur = {revenue:0, profit:0, time_billing:0};
   var pri = {revenue:0, profit:0, time_billing:0};
   for (var i = 0; i < ALL_PROJECTS.length; i++) {
-    var md = ALL_PROJECTS[i].monthly_data || {};
+    var p = ALL_PROJECTS[i];
+    if (hasDes && dState.designers.indexOf(p.designer) < 0) continue;
+    var md = p.monthly_data || {};
     var keys = Object.keys(md);
     for (var j = 0; j < keys.length; j++) {
       var k = keys[j];
@@ -690,10 +719,58 @@ function syncMonthButtons() {
 }
 
 function clearDateFilters() {
-  dState = {year:'all', months:[]};
+  dState.year = 'all';
+  dState.months = [];
   document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn, #presetRow .f-btn').forEach(function(b){b.classList.remove('on');});
   var a = document.querySelector('#yearRow .f-btn[data-y="all"]');  if (a) a.classList.add('on');
   var b = document.querySelector('#presetRow .f-btn[data-p="all"]'); if (b) b.classList.add('on');
+  refreshAll();
+}
+
+// ── Team / designer filter ──
+function buildTeamBtns() {
+  var seen = {};
+  var list = [];
+  for (var i = 0; i < ALL_PROJECTS.length; i++) {
+    var p = ALL_PROJECTS[i];
+    if (p.designer === 'Unassigned' || seen[p.designer]) continue;
+    seen[p.designer] = true;
+    list.push({ name: p.designer, label: p.designer_label, color: p.color_hex });
+  }
+  if (!list.length) return;
+  list.sort(function(a,b){ return a.label.localeCompare(b.label); });
+
+  var html = '<button class="f-btn on" onclick="clearDesigners(this)">All (Company)</button>';
+  for (var i = 0; i < list.length; i++) {
+    var d = list[i];
+    html += '<button class="f-btn team-btn" data-des="' + d.name.replace(/"/g,'&quot;') +
+      '" style="border-left:3px solid ' + d.color + ';"' +
+      ' onclick="toggleDesigner(this)">' + d.label + '</button>';
+  }
+  document.getElementById('teamRow').innerHTML = html;
+  document.getElementById('teamFilterBar').style.display = 'flex';
+}
+
+function toggleDesigner(btn) {
+  var name = btn.getAttribute('data-des');
+  var idx = dState.designers.indexOf(name);
+  if (idx >= 0) dState.designers.splice(idx, 1);
+  else          dState.designers.push(name);
+  // Toggle "All" button state
+  var allBtn = document.querySelector('#teamRow .f-btn:first-child');
+  if (dState.designers.length === 0) {
+    if (allBtn) allBtn.classList.add('on');
+  } else {
+    if (allBtn) allBtn.classList.remove('on');
+  }
+  btn.classList.toggle('on');
+  refreshAll();
+}
+
+function clearDesigners(btn) {
+  dState.designers = [];
+  document.querySelectorAll('#teamRow .f-btn').forEach(function(b){ b.classList.remove('on'); });
+  if (btn) btn.classList.add('on');
   refreshAll();
 }
 
@@ -1051,7 +1128,7 @@ function renderCompareLine(ctx) {
 // ═══════════════════════════════════════════════════════
 
 function refreshAll() {
-  var filtered = filterByDate(ALL_PROJECTS);
+  var filtered = filterProjects(ALL_PROJECTS);
   tState.filtered = filtered;
   renderKPIs(filtered);
   renderDesignerBars(filtered);
@@ -1074,6 +1151,7 @@ if (ALL_PROJECTS.length) {
   renderTable();
   buildDesFilterBtns(ALL_PROJECTS);
   buildYearBtns();
+  buildTeamBtns();
   renderComparePeriods();
   renderCompareChart();
 }

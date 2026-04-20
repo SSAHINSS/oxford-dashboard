@@ -1310,3 +1310,9 @@ body {
 @media (max-width: 520px) {
   .kpi-grid { grid-template-columns: 1fr; }
 }
+
+/* ── TEAM FILTER BAR ── */
+.team-btn { padding-left: 11px; }
+.team-btn.on { border-left-width: 3px !important; border-left-style: solid !important; }
+
+#teamRow { align-items: center; }
