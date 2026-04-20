@@ -98,9 +98,10 @@
       <div class="tool-group">
         <span class="tg-label">Chart type</span>
         <div class="btn-row" id="cmpChartRow">
-          <button class="f-btn on" onclick="setCompareChartType('grouped',this)">Grouped Bars</button>
+          <button class="f-btn on" onclick="setCompareChartType('period',this)">By Period</button>
+          <button class="f-btn"    onclick="setCompareChartType('designer',this)">By Designer</button>
           <button class="f-btn"    onclick="setCompareChartType('line',this)">Monthly Trend</button>
-          <button class="f-btn"    onclick="setCompareChartType('stacked',this)">Stacked Bars</button>
+          <button class="f-btn"    onclick="setCompareChartType('stacked',this)">Stacked by Designer</button>
         </div>
       </div>
       <div class="tool-group">
@@ -224,7 +225,7 @@ var chart = null;
 var currentChartMode = 'profit';
 
 // Period comparison state
-var compareState = { periods: [], chartType: 'grouped', metric: 'profit' };
+var compareState = { periods: [], chartType: 'period', metric: 'profit' };
 var compareChart = null;
 var PERIOD_COLORS = ['#353738', '#b89653', '#8a8e73', '#8a6b42', '#e4c77a'];  // ink, gold, olive-light, warm-brown, gold-light
 
@@ -1013,14 +1014,121 @@ function renderCompareChart() {
   var ctx = canvas.getContext('2d');
   if (compareState.chartType === 'line') renderCompareLine(ctx);
   else if (compareState.chartType === 'stacked') renderCompareStacked(ctx);
-  else renderCompareGrouped(ctx);
+  else if (compareState.chartType === 'designer') renderCompareByDesigner(ctx);
+  else renderCompareByPeriod(ctx);  // default
 
-  // Legend
+  // Legend: period-colored dots when the chart colors by period
+  // designer-mode will override this below
   var html = compareState.periods.map(function(p, idx) {
     var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
     return '<span class="leg-item"><span class="leg-dot" style="background:'+color+';"></span>'+periodLabel(p)+'</span>';
   }).join('');
   document.getElementById('compareLegend').innerHTML = html;
+}
+
+// ── "By Period": simple totals per period, no designer breakdown ──
+function renderCompareByPeriod(ctx) {
+  var metric = compareState.metric;
+  var periodTotals = compareState.periods.map(function(period) {
+    var hasDes = dState.designers.length > 0;
+    var months = resolveMonths(period);
+    var rev = 0, prof = 0, tb = 0;
+    for (var i = 0; i < ALL_PROJECTS.length; i++) {
+      var p = ALL_PROJECTS[i];
+      if (p.designer === 'Unassigned') continue;
+      if (hasDes && dState.designers.indexOf(p.designer) < 0) continue;
+      var md = p.monthly_data || {};
+      var keys = Object.keys(md);
+      for (var j = 0; j < keys.length; j++) {
+        var k = keys[j], parts = k.split('-');
+        if (period.year !== 'all' && parts[0] !== period.year) continue;
+        if (months && months.indexOf(parts[1]) < 0) continue;
+        rev  += md[k].revenue      || 0;
+        prof += md[k].profit       || 0;
+        tb   += md[k].time_billing || 0;
+      }
+    }
+    var margin = rev > 0 ? Math.round(prof/rev*1000)/10 : 0;
+    return {revenue:rev, profit:prof, margin:margin, time_billing:tb};
+  });
+
+  var labels = compareState.periods.map(periodLabel);
+  var vals   = periodTotals.map(function(t){ return t[metric] || 0; });
+  var colors = compareState.periods.map(function(_, idx) { return PERIOD_COLORS[idx % PERIOD_COLORS.length]; });
+
+  var fmtFn = metric === 'margin' ? function(v){return (v||0).toFixed(1)+'%';} : function(v){return fmt(v);};
+  compareChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: vals,
+        backgroundColor: colors.map(function(c){return c + 'cc';}),
+        borderColor:     colors,
+        borderWidth: 1, borderRadius: 2
+      }]
+    },
+    options: compareOpts(fmtFn, false)
+  });
+}
+
+// ── Opacity helper: newer periods darker, older lighter ──
+function periodOpacity(idx, total) {
+  if (total <= 1) return 1;
+  // idx 0 = most recent = full opacity
+  var step = 0.7 / Math.max(1, total - 1);
+  return Math.max(0.3, 1 - (idx * step));
+}
+
+function hexWithAlpha(hex, alpha) {
+  // Convert "#rrggbb" + float → "#rrggbbAA"
+  var a = Math.max(0, Math.min(1, alpha));
+  var ah = Math.round(a * 255).toString(16);
+  if (ah.length < 2) ah = '0' + ah;
+  return hex + ah;
+}
+
+// ── "By Designer": grouped bars, each designer their own color ──
+function renderCompareByDesigner(ctx) {
+  var periodData = compareState.periods.map(aggregatePeriodByDesigner);
+  var all = {};
+  for (var i = 0; i < periodData.length; i++) {
+    for (var k in periodData[i]) if (!all[k]) all[k] = periodData[i][k];
+  }
+  var desKeys = Object.keys(all);
+  if (!desKeys.length) { drawCompareEmpty(document.getElementById('compareChart'), 'No data for selected periods'); return; }
+
+  var metric = compareState.metric;
+  var total = compareState.periods.length;
+  var datasets = compareState.periods.map(function(p, idx) {
+    var alpha = periodOpacity(idx, total);
+    return {
+      label: periodLabel(p),
+      // Each bar gets the color of its designer (all[d].color)
+      data: desKeys.map(function(d){ return (periodData[idx][d] || {})[metric] || 0; }),
+      backgroundColor: desKeys.map(function(d){ return hexWithAlpha(all[d].color, alpha); }),
+      borderColor:     desKeys.map(function(d){ return all[d].color; }),
+      borderWidth: 1,
+      borderRadius: 2
+    };
+  });
+  var fmtFn = metric === 'margin' ? function(v){return (v||0).toFixed(1)+'%';} : function(v){return fmt(v);};
+  compareChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: desKeys.map(function(d){return all[d].label;}), datasets: datasets },
+    options: compareOpts(fmtFn, false)
+  });
+
+  // Custom legend: show period labels with opacity indicators (neutral tone)
+  var legendHtml = compareState.periods.map(function(p, idx) {
+    var alpha = periodOpacity(idx, total);
+    return '<span class="leg-item">' +
+      '<span class="leg-dot" style="background:rgba(68,71,53,' + alpha.toFixed(2) + ');border:1px solid var(--deep-olive);"></span>' +
+      periodLabel(p) +
+    '</span>';
+  }).join('');
+  document.getElementById('compareLegend').innerHTML = legendHtml +
+    '<span class="leg-item" style="color:var(--ink-xlight);font-style:italic;font-size:10px;">newer periods darker · bar color = designer</span>';
 }
 
 function renderCompareGrouped(ctx) {
@@ -1057,12 +1165,15 @@ function renderCompareStacked(ctx) {
   var desKeys = Object.keys(all);
   if (!desKeys.length) { drawCompareEmpty(document.getElementById('compareChart'), 'No data for selected periods'); return; }
   var metric = compareState.metric;
+  var total = compareState.periods.length;
   var datasets = compareState.periods.map(function(p, idx) {
-    var c = PERIOD_COLORS[idx % PERIOD_COLORS.length];
+    var alpha = periodOpacity(idx, total);
     return {
       label: periodLabel(p),
       data: desKeys.map(function(d){ return (periodData[idx][d] || {})[metric] || 0; }),
-      backgroundColor: c + 'cc', borderColor: c, borderWidth: 1
+      backgroundColor: desKeys.map(function(d){ return hexWithAlpha(all[d].color, alpha); }),
+      borderColor:     desKeys.map(function(d){ return all[d].color; }),
+      borderWidth: 1
     };
   });
   var fmtFn = metric === 'margin' ? function(v){return (v||0).toFixed(1)+'%';} : function(v){return fmt(v);};
@@ -1071,6 +1182,16 @@ function renderCompareStacked(ctx) {
     data: { labels: desKeys.map(function(d){return all[d].label;}), datasets: datasets },
     options: compareOpts(fmtFn, true)
   });
+  // Opacity legend
+  var legendHtml = compareState.periods.map(function(p, idx) {
+    var alpha = periodOpacity(idx, total);
+    return '<span class="leg-item">' +
+      '<span class="leg-dot" style="background:rgba(68,71,53,' + alpha.toFixed(2) + ');border:1px solid var(--deep-olive);"></span>' +
+      periodLabel(p) +
+    '</span>';
+  }).join('');
+  document.getElementById('compareLegend').innerHTML = legendHtml +
+    '<span class="leg-item" style="color:var(--ink-xlight);font-style:italic;font-size:10px;">newer periods darker · bar color = designer</span>';
 }
 
 function renderCompareLine(ctx) {
