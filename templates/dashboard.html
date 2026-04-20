@@ -102,6 +102,46 @@
   </div>
 </section>
 
+<!-- Period Comparison -->
+<section style="margin-bottom:48px;">
+  <div class="section-header">
+    <span class="section-label">Period Comparison</span>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="compare-controls">
+    <div class="compare-periods" id="comparePeriods"></div>
+    <button class="btn-ghost small" onclick="addComparePeriod()" style="margin-top:8px;">+ Add period</button>
+
+    <div class="compare-tabs">
+      <div class="tool-group">
+        <span class="tg-label">Chart type</span>
+        <div class="btn-row" id="cmpChartRow">
+          <button class="f-btn on" onclick="setCompareChartType('grouped',this)">Grouped Bars</button>
+          <button class="f-btn" onclick="setCompareChartType('line',this)">Monthly Trend</button>
+          <button class="f-btn" onclick="setCompareChartType('stacked',this)">Stacked Bars</button>
+        </div>
+      </div>
+      <div class="tool-group">
+        <span class="tg-label">Metric</span>
+        <div class="btn-row" id="cmpMetricRow">
+          <button class="f-btn on" onclick="setCompareMetric('profit',this)">Profit</button>
+          <button class="f-btn" onclick="setCompareMetric('revenue',this)">Revenue</button>
+          <button class="f-btn" onclick="setCompareMetric('margin',this)">Margin %</button>
+          <button class="f-btn" onclick="setCompareMetric('time_billing',this)">Time Billing</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-wrap" style="min-height:360px;">
+    <div style="position:relative;height:340px;">
+      <canvas id="compareChart"></canvas>
+    </div>
+    <div class="legend-row" id="compareLegend" style="margin-top:16px;justify-content:center;"></div>
+  </div>
+</section>
+
 <section class="table-section">
   <div class="section-header"><span class="section-label">Project Breakdown</span><div class="section-line"></div></div>
   <div class="toolbar">
@@ -463,6 +503,301 @@ function setSort(key, btn) {
   renderTable();
 }
 
+// ── PERIOD COMPARISON ──────────────────────────────────────────
+var compareState = {
+  periods: [],
+  chartType: 'grouped',
+  metric: 'profit'
+};
+var compareChart = null;
+var PERIOD_COLORS = ['#1c1a16', '#7b5ea7', '#b8963a', '#2d6a9f', '#c96a3a'];
+
+function getAvailableYears() {
+  var years = {};
+  ALL_PROJECTS.forEach(function(p) {
+    Object.keys(p.monthly_data || {}).forEach(function(k) { years[k.split('-')[0]] = true; });
+  });
+  return Object.keys(years).sort();
+}
+
+function initComparePeriods() {
+  var years = getAvailableYears();
+  // Default: show the latest 3 years (or whatever is available)
+  compareState.periods = years.slice(-3).map(function(y) { return {year: y, month: 'all'}; });
+  if (!compareState.periods.length) compareState.periods = [{year:'all', month:'all'}];
+}
+
+function yearOptionsHtml(selected) {
+  var years = getAvailableYears();
+  var html = '<option value="all"' + (selected === 'all' ? ' selected' : '') + '>All years</option>';
+  years.forEach(function(y) {
+    html += '<option value="' + y + '"' + (selected === y ? ' selected' : '') + '>' + y + '</option>';
+  });
+  return html;
+}
+
+function monthOptionsHtml(selected) {
+  var months = [['all','All months'],['01','Jan'],['02','Feb'],['03','Mar'],['04','Apr'],
+                ['05','May'],['06','Jun'],['07','Jul'],['08','Aug'],['09','Sep'],
+                ['10','Oct'],['11','Nov'],['12','Dec']];
+  return months.map(function(m) {
+    return '<option value="' + m[0] + '"' + (selected === m[0] ? ' selected' : '') + '>' + m[1] + '</option>';
+  }).join('');
+}
+
+function renderComparePeriods() {
+  var html = compareState.periods.map(function(p, idx) {
+    var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
+    return '<div class="compare-period-row">' +
+      '<span class="period-color" style="background:' + color + ';"></span>' +
+      '<select class="compare-select" data-idx="' + idx + '" data-key="year" onchange="updateComparePeriod(this)">' +
+        yearOptionsHtml(p.year) +
+      '</select>' +
+      '<select class="compare-select" data-idx="' + idx + '" data-key="month" onchange="updateComparePeriod(this)">' +
+        monthOptionsHtml(p.month) +
+      '</select>' +
+      (compareState.periods.length > 1 ?
+        '<button class="x-btn" title="Remove" onclick="removeComparePeriod(' + idx + ')">×</button>' : '') +
+      '</div>';
+  }).join('');
+  document.getElementById('comparePeriods').innerHTML = html;
+}
+
+function updateComparePeriod(sel) {
+  var idx = parseInt(sel.dataset.idx);
+  var key = sel.dataset.key;
+  compareState.periods[idx][key] = sel.value;
+  renderCompareChart();
+}
+
+function addComparePeriod() {
+  if (compareState.periods.length >= 5) {
+    alert('Maximum 5 periods for comparison.');
+    return;
+  }
+  var last = compareState.periods[compareState.periods.length - 1];
+  compareState.periods.push({year: last ? last.year : 'all', month: last ? last.month : 'all'});
+  renderComparePeriods();
+  renderCompareChart();
+}
+
+function removeComparePeriod(idx) {
+  compareState.periods.splice(idx, 1);
+  renderComparePeriods();
+  renderCompareChart();
+}
+
+function setCompareChartType(type, btn) {
+  compareState.chartType = type;
+  document.querySelectorAll('#cmpChartRow .f-btn').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  renderCompareChart();
+}
+
+function setCompareMetric(metric, btn) {
+  compareState.metric = metric;
+  document.querySelectorAll('#cmpMetricRow .f-btn').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  renderCompareChart();
+}
+
+function aggregatePeriodByDesigner(period) {
+  var desMap = {};
+  ALL_PROJECTS.forEach(function(p) {
+    if (p.designer === 'Unassigned') return;
+    var md = p.monthly_data || {};
+    var rev = 0, prof = 0, tb = 0;
+    Object.keys(md).forEach(function(k) {
+      var parts = k.split('-');
+      if (period.year !== 'all' && parts[0] !== period.year) return;
+      if (period.month !== 'all' && parts[1] !== period.month) return;
+      rev  += md[k].revenue      || 0;
+      prof += md[k].profit       || 0;
+      tb   += md[k].time_billing || 0;
+    });
+    if (rev === 0 && prof === 0 && tb === 0) return;
+    if (!desMap[p.designer]) {
+      desMap[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0, time_billing:0};
+    }
+    desMap[p.designer].revenue      += rev;
+    desMap[p.designer].profit       += prof;
+    desMap[p.designer].time_billing += tb;
+  });
+  Object.values(desMap).forEach(function(d) {
+    d.margin = d.revenue > 0 ? Math.round(d.profit/d.revenue*1000)/10 : 0;
+  });
+  return desMap;
+}
+
+function aggregatePeriodByMonth(period) {
+  var monthMap = {};
+  for (var i = 1; i <= 12; i++) {
+    var m = i < 10 ? '0' + i : '' + i;
+    monthMap[m] = {revenue:0, profit:0, time_billing:0};
+  }
+  ALL_PROJECTS.forEach(function(p) {
+    var md = p.monthly_data || {};
+    Object.keys(md).forEach(function(k) {
+      var parts = k.split('-');
+      if (period.year !== 'all' && parts[0] !== period.year) return;
+      var month = parts[1];
+      if (!monthMap[month]) return;
+      monthMap[month].revenue      += md[k].revenue      || 0;
+      monthMap[month].profit       += md[k].profit       || 0;
+      monthMap[month].time_billing += md[k].time_billing || 0;
+    });
+  });
+  Object.values(monthMap).forEach(function(m) {
+    m.margin = m.revenue > 0 ? Math.round(m.profit/m.revenue*1000)/10 : 0;
+  });
+  return monthMap;
+}
+
+function periodLabel(period) {
+  var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var m = period.month === 'all' ? '' : monthNames[parseInt(period.month)] + ' ';
+  var y = period.year === 'all' ? 'All' : period.year;
+  return m + y;
+}
+
+function compareFmtFn(metric) {
+  return metric === 'margin'
+    ? function(v) { return (v || 0).toFixed(1) + '%'; }
+    : function(v) { return fmt(v); };
+}
+
+function commonCompareOptions(fmtFn, stacked) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true, position: 'bottom',
+        labels: { color: '#5a564e', font: { size: 11 }, boxWidth: 12, padding: 12 }
+      },
+      tooltip: {
+        callbacks: { label: function(c) { return c.dataset.label + ': ' + fmtFn(c.raw); } },
+        backgroundColor: 'rgba(28,26,22,0.92)', titleColor: '#a09890', bodyColor: '#f7f4ee',
+        padding: 12, cornerRadius: 2
+      }
+    },
+    scales: {
+      x: {
+        stacked: stacked || false,
+        grid: { display: false }, border: { display: false },
+        ticks: { color: '#a09890', font: { size: 11 } }
+      },
+      y: {
+        stacked: stacked || false,
+        grid: { color: 'rgba(28,26,22,0.04)' }, border: { display: false },
+        ticks: { color: '#a09890', font: { size: 11 }, callback: function(v){ return fmtFn(v); } }
+      }
+    }
+  };
+}
+
+function renderCompareChart() {
+  if (typeof Chart === 'undefined') return;
+  if (compareChart) { compareChart.destroy(); compareChart = null; }
+  var wrap = document.getElementById('compareChart').parentNode;
+  wrap.innerHTML = '<canvas id="compareChart"></canvas>';
+  var ctx = document.getElementById('compareChart').getContext('2d');
+
+  if (compareState.chartType === 'line') renderCompareLineChart(ctx);
+  else if (compareState.chartType === 'stacked') renderCompareStackedChart(ctx);
+  else renderCompareGroupedChart(ctx);
+}
+
+function renderCompareGroupedChart(ctx) {
+  var periodData = compareState.periods.map(aggregatePeriodByDesigner);
+  var allDes = {};
+  periodData.forEach(function(pd) {
+    Object.keys(pd).forEach(function(d) { if (!allDes[d]) allDes[d] = pd[d]; });
+  });
+  var desKeys = Object.keys(allDes);
+  if (!desKeys.length) { drawNoData(ctx); return; }
+  var desLabels = desKeys.map(function(d) { return allDes[d].label; });
+
+  var metric = compareState.metric;
+  var datasets = compareState.periods.map(function(p, idx) {
+    var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
+    var pd = periodData[idx];
+    return {
+      label: periodLabel(p),
+      data: desKeys.map(function(d) { return (pd[d] || {})[metric] || 0; }),
+      backgroundColor: color + 'cc', borderColor: color,
+      borderWidth: 1, borderRadius: 2
+    };
+  });
+  var fmtFn = compareFmtFn(metric);
+  compareChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: desLabels, datasets: datasets },
+    options: commonCompareOptions(fmtFn, false)
+  });
+}
+
+function renderCompareStackedChart(ctx) {
+  var periodData = compareState.periods.map(aggregatePeriodByDesigner);
+  var allDes = {};
+  periodData.forEach(function(pd) {
+    Object.keys(pd).forEach(function(d) { if (!allDes[d]) allDes[d] = pd[d]; });
+  });
+  var desKeys = Object.keys(allDes);
+  if (!desKeys.length) { drawNoData(ctx); return; }
+  var desLabels = desKeys.map(function(d) { return allDes[d].label; });
+
+  var metric = compareState.metric;
+  var datasets = compareState.periods.map(function(p, idx) {
+    var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
+    var pd = periodData[idx];
+    return {
+      label: periodLabel(p),
+      data: desKeys.map(function(d) { return (pd[d] || {})[metric] || 0; }),
+      backgroundColor: color + 'cc', borderColor: color, borderWidth: 1
+    };
+  });
+  var fmtFn = compareFmtFn(metric);
+  compareChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: desLabels, datasets: datasets },
+    options: commonCompareOptions(fmtFn, true)
+  });
+}
+
+function renderCompareLineChart(ctx) {
+  var monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var metric = compareState.metric;
+
+  var datasets = compareState.periods.map(function(p, idx) {
+    var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
+    var periodForLine = {year: p.year, month: 'all'};
+    var monthData = aggregatePeriodByMonth(periodForLine);
+    var vals = ['01','02','03','04','05','06','07','08','09','10','11','12'].map(function(m) {
+      return (monthData[m] || {})[metric] || 0;
+    });
+    return {
+      label: p.year === 'all' ? 'All years' : p.year,
+      data: vals,
+      borderColor: color, backgroundColor: color + '22',
+      borderWidth: 2.5, tension: 0.25, fill: false,
+      pointRadius: 3, pointBackgroundColor: color
+    };
+  });
+  var fmtFn = compareFmtFn(metric);
+  compareChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: monthLabels, datasets: datasets },
+    options: commonCompareOptions(fmtFn, false)
+  });
+}
+
+function drawNoData(ctx) {
+  ctx.font = '14px "DM Sans", sans-serif';
+  ctx.fillStyle = '#a09890';
+  ctx.textAlign = 'center';
+  ctx.fillText('No data for selected periods', ctx.canvas.width / 2, ctx.canvas.height / 2);
+}
+
 // ── Init ──
 if (ALL_PROJECTS.length) {
   tState.filtered = ALL_PROJECTS;
@@ -473,6 +808,9 @@ if (ALL_PROJECTS.length) {
   renderTable();
   buildDesFilterBtns(ALL_PROJECTS);
   buildYearBtns();
+  initComparePeriods();
+  renderComparePeriods();
+  renderCompareChart();
 }
 </script>
 {% endblock %}
