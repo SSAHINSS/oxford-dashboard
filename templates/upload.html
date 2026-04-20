@@ -306,15 +306,23 @@ function confirmAssignments() {
       assignments: assignList
     })
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) {
+    if (!r.ok) throw new Error('Server error ' + r.status);
+    return r.json();
+  })
   .then(function(data) {
     if (data.success) {
       window.location.href = '/?period_id=' + data.period_id;
     } else {
-      alert('Error saving data.');
+      alert('Error saving data: ' + (data.detail || 'unknown error'));
       btn.disabled = false;
       btn.textContent = 'Save & Generate Dashboard →';
     }
+  })
+  .catch(function(err) {
+    alert('Upload failed: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Save & Generate Dashboard →';
   });
 }
 

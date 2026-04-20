@@ -355,10 +355,18 @@ async def upload_parse(file: UploadFile = File(...), current_user: User = Depend
 
     existing = db.query(Period).filter(Period.filename == file.filename, Period.row_count == parsed["row_count"]).first()
     if existing:
-        return JSONResponse({"duplicate": True, "duplicate_period": {
-            "id": existing.id, "label": existing.label,
-            "uploaded_at": existing.uploaded_at.strftime("%b %d, %Y")
-        }})
+        # Only treat as duplicate if the period actually has project data
+        # An empty period means a previous upload failed — allow re-upload
+        project_count = db.query(Project).filter(Project.period_id == existing.id).count()
+        if project_count > 0:
+            return JSONResponse({"duplicate": True, "duplicate_period": {
+                "id": existing.id, "label": existing.label,
+                "uploaded_at": existing.uploaded_at.strftime("%b %d, %Y")
+            }})
+        else:
+            # Delete the empty period so a fresh upload can proceed
+            db.delete(existing)
+            db.commit()
 
     norm_index = {c.name_normalized: c for c in db.query(Client).all()}
     clients_out = []
