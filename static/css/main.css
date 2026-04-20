@@ -657,7 +657,7 @@ body {
 }
 
 /* ────────────────────────────────────────
-   KPI CARDS — single dynamic variant
+   KPI CARDS — Garamond numbers, dynamic
    ──────────────────────────────────────── */
 .kpi-grid {
   display: grid;
@@ -674,7 +674,7 @@ body {
   transition: all 0.3s;
   position: relative;
   overflow: hidden;
-  min-height: 210px;
+  min-height: 220px;
   display: flex;
   flex-direction: column;
 }
@@ -683,13 +683,13 @@ body {
   position: absolute;
   top: 0; left: 0;
   width: 3px;
-  height: 40px;
+  height: 44px;
   background: var(--deep-olive);
   transition: height 0.25s;
 }
 .kpi-card.accent::before { background: var(--gold); }
 .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-.kpi-card:hover::before { height: 60px; }
+.kpi-card:hover::before { height: 66px; }
 
 .kpi-label {
   font-family: var(--sans);
@@ -701,16 +701,16 @@ body {
   margin-bottom: 14px;
 }
 
-/* Numbers use Inter for cohesion with rest of dashboard */
+/* Hero number — Garamond, brand-first */
 .kpi-value {
-  font-family: var(--sans);
-  font-size: 34px;
-  font-weight: 600;
+  font-family: var(--serif);
+  font-size: 42px;
+  font-weight: 400;
   line-height: 1;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .kpi-card.accent .kpi-value { color: var(--gold-dark); }
 
@@ -718,22 +718,20 @@ body {
   font-family: var(--sans);
   font-size: 10px;
   color: var(--ink-xlight);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   font-weight: 500;
   font-feature-settings: 'tnum';
 }
 
-/* Sparkline */
 .kpi-spark {
   height: 44px;
-  margin: 0 -4px 12px;
+  margin: 0 -4px 14px;
   position: relative;
 }
 .kpi-spark svg { overflow: visible; display: block; }
 
-/* Trend row */
 .kpi-trend {
   display: flex;
   align-items: center;
@@ -760,6 +758,21 @@ body {
 .kpi-trend.flat .trend-pill { background: var(--olive-faint);       color: var(--ink-xlight); }
 .trend-arrow { font-size: 10px; }
 .trend-meta  { color: var(--ink-xlight); font-weight: 400; font-style: italic; font-size: 10px; letter-spacing: 0.04em; }
+
+.tg-hint {
+  font-weight: 400;
+  font-size: 9px;
+  color: var(--ink-xlight);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-style: italic;
+  margin-left: 4px;
+}
+
+.chart-canvas-wrap {
+  position: relative;
+  height: 260px;
+}
 
 /* ────────────────────────────────────────
    SECTIONS

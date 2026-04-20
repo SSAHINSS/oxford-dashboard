@@ -12,9 +12,7 @@
     {% if periods %}
     <select class="period-select" onchange="window.location='/?period_id='+this.value">
       {% for p in periods %}
-      <option value="{{ p.id }}" {% if selected_period and selected_period.id == p.id %}selected{% endif %}>
-        {{ p.label }}
-      </option>
+      <option value="{{ p.id }}" {% if selected_period and selected_period.id == p.id %}selected{% endif %}>{{ p.label }}</option>
       {% endfor %}
     </select>
     {% endif %}
@@ -53,7 +51,7 @@
     </div>
   </div>
   <div class="date-filter-group">
-    <span class="tg-label">Months <span style="font-weight:400;font-size:9px;color:var(--ink-xlight);letter-spacing:0.04em;text-transform:none;font-style:italic;">(click to toggle — multi-select)</span></span>
+    <span class="tg-label">Months <span class="tg-hint">multi-select</span></span>
     <div class="btn-row" id="monthRow">
       <button class="f-btn" data-m="01" onclick="toggleMonth('01',this)">Jan</button>
       <button class="f-btn" data-m="02" onclick="toggleMonth('02',this)">Feb</button>
@@ -76,9 +74,7 @@
 <div class="empty-state">
   <h2 class="empty-title">No data yet</h2>
   <p class="empty-sub">Upload a Studio export to get started.</p>
-  {% if user.role == 'admin' %}
-  <a href="/upload" class="btn-primary">Upload Studio Export →</a>
-  {% endif %}
+  {% if user.role == 'admin' %}<a href="/upload" class="btn-primary">Upload Studio Export →</a>{% endif %}
 </div>
 {% else %}
 
@@ -103,54 +99,43 @@
   <div class="chart-wrap">
     <div class="legend-row" id="chartLegend"></div>
     <div class="chart-tabs">
-      <button class="tab-btn active" onclick="switchChart('profit',this)">Total Profit</button>
-      <button class="tab-btn" onclick="switchChart('revenue',this)">Revenue</button>
-      <button class="tab-btn" onclick="switchChart('margin',this)">Margin %</button>
-      <button class="tab-btn" onclick="switchChart('timebilling',this)">Time Billing</button>
+      <button class="tab-btn active" data-mode="profit"       onclick="switchChart('profit',this)">Total Profit</button>
+      <button class="tab-btn"        data-mode="revenue"      onclick="switchChart('revenue',this)">Revenue</button>
+      <button class="tab-btn"        data-mode="margin"       onclick="switchChart('margin',this)">Margin %</button>
+      <button class="tab-btn"        data-mode="time_billing" onclick="switchChart('time_billing',this)">Time Billing</button>
     </div>
-    <div style="position:relative;height:260px;">
-      <canvas id="mainChart"></canvas>
-    </div>
+    <div class="chart-canvas-wrap"><canvas id="mainChart"></canvas></div>
   </div>
 </section>
 
-<!-- Period Comparison -->
-<section style="margin-bottom:48px;">
-  <div class="section-header">
-    <span class="section-label">Period Comparison</span>
-    <div class="section-line"></div>
-  </div>
-
+<section style="margin-bottom:56px;">
+  <div class="section-header"><span class="section-label">Period Comparison</span><div class="section-line"></div></div>
   <div class="compare-controls">
     <div class="compare-periods" id="comparePeriods"></div>
-    <button class="btn-ghost small" onclick="addComparePeriod()" style="margin-top:8px;">+ Add period</button>
-
+    <button class="btn-ghost small" onclick="addComparePeriod()" style="margin-top:10px;">+ Add period</button>
     <div class="compare-tabs">
       <div class="tool-group">
         <span class="tg-label">Chart type</span>
         <div class="btn-row" id="cmpChartRow">
           <button class="f-btn on" onclick="setCompareChartType('grouped',this)">Grouped Bars</button>
-          <button class="f-btn" onclick="setCompareChartType('line',this)">Monthly Trend</button>
-          <button class="f-btn" onclick="setCompareChartType('stacked',this)">Stacked Bars</button>
+          <button class="f-btn"    onclick="setCompareChartType('line',this)">Monthly Trend</button>
+          <button class="f-btn"    onclick="setCompareChartType('stacked',this)">Stacked Bars</button>
         </div>
       </div>
       <div class="tool-group">
         <span class="tg-label">Metric</span>
         <div class="btn-row" id="cmpMetricRow">
           <button class="f-btn on" onclick="setCompareMetric('profit',this)">Profit</button>
-          <button class="f-btn" onclick="setCompareMetric('revenue',this)">Revenue</button>
-          <button class="f-btn" onclick="setCompareMetric('margin',this)">Margin %</button>
-          <button class="f-btn" onclick="setCompareMetric('time_billing',this)">Time Billing</button>
+          <button class="f-btn"    onclick="setCompareMetric('revenue',this)">Revenue</button>
+          <button class="f-btn"    onclick="setCompareMetric('margin',this)">Margin %</button>
+          <button class="f-btn"    onclick="setCompareMetric('time_billing',this)">Time Billing</button>
         </div>
       </div>
     </div>
   </div>
-
-  <div class="chart-wrap" style="min-height:360px;">
-    <div style="position:relative;height:340px;">
-      <canvas id="compareChart"></canvas>
-    </div>
-    <div class="legend-row" id="compareLegend" style="margin-top:16px;justify-content:center;"></div>
+  <div class="chart-wrap" style="min-height:380px;">
+    <div class="chart-canvas-wrap" style="height:340px;"><canvas id="compareChart"></canvas></div>
+    <div class="legend-row" id="compareLegend" style="margin-top:18px;justify-content:center;"></div>
   </div>
 </section>
 
@@ -159,26 +144,24 @@
   <div class="toolbar">
     <div class="tool-group">
       <span class="tg-label">Designer</span>
-      <div class="btn-row" id="desFiltRow">
-        <button class="f-btn on" onclick="setDesFilter('All',this)">All</button>
-      </div>
+      <div class="btn-row" id="desFiltRow"><button class="f-btn on" onclick="setDesFilter('All',this)">All</button></div>
     </div>
     <div class="tool-group">
       <span class="tg-label">Margin</span>
       <div class="btn-row" id="margRow">
         <button class="f-btn on" onclick="setFilt('margin','all',this,'#margRow')">All</button>
-        <button class="f-btn" onclick="setFilt('margin','high',this,'#margRow')">&gt;50%</button>
-        <button class="f-btn" onclick="setFilt('margin','mid',this,'#margRow')">30–50%</button>
-        <button class="f-btn" onclick="setFilt('margin','low',this,'#margRow')">&lt;30%</button>
+        <button class="f-btn"    onclick="setFilt('margin','high',this,'#margRow')">&gt;50%</button>
+        <button class="f-btn"    onclick="setFilt('margin','mid',this,'#margRow')">30–50%</button>
+        <button class="f-btn"    onclick="setFilt('margin','low',this,'#margRow')">&lt;30%</button>
       </div>
     </div>
     <div class="tool-group">
       <span class="tg-label">Revenue</span>
       <div class="btn-row" id="revRow">
         <button class="f-btn on" onclick="setFilt('rev','all',this,'#revRow')">All</button>
-        <button class="f-btn" onclick="setFilt('rev','large',this,'#revRow')">&gt;$500K</button>
-        <button class="f-btn" onclick="setFilt('rev','mid',this,'#revRow')">$100K–500K</button>
-        <button class="f-btn" onclick="setFilt('rev','small',this,'#revRow')">&lt;$100K</button>
+        <button class="f-btn"    onclick="setFilt('rev','large',this,'#revRow')">&gt;$500K</button>
+        <button class="f-btn"    onclick="setFilt('rev','mid',this,'#revRow')">$100K–500K</button>
+        <button class="f-btn"    onclick="setFilt('rev','small',this,'#revRow')">&lt;$100K</button>
       </div>
     </div>
     <div class="tool-group">
@@ -186,15 +169,15 @@
       <input class="search-box" type="text" placeholder="Client name…" oninput="doSearch(this.value)">
     </div>
   </div>
-  <div class="toolbar" style="margin-top:-6px;margin-bottom:12px;">
+  <div class="toolbar" style="margin-top:-6px;margin-bottom:14px;">
     <div class="tool-group">
       <span class="tg-label">Sort by</span>
       <div class="btn-row">
-        <button class="s-btn" onclick="setSort('client',this)">Client <span class="s-arrow" id="sa-client"></span></button>
-        <button class="s-btn" onclick="setSort('revenue',this)">Revenue <span class="s-arrow" id="sa-revenue"></span></button>
+        <button class="s-btn"    onclick="setSort('client',this)">Client <span class="s-arrow" id="sa-client"></span></button>
+        <button class="s-btn"    onclick="setSort('revenue',this)">Revenue <span class="s-arrow" id="sa-revenue"></span></button>
         <button class="s-btn on" onclick="setSort('profit',this)">Profit <span class="s-arrow" id="sa-profit">↓</span></button>
-        <button class="s-btn" onclick="setSort('margin',this)">Margin % <span class="s-arrow" id="sa-margin"></span></button>
-        <button class="s-btn" onclick="setSort('time_billing',this)">Time Billing <span class="s-arrow" id="sa-time_billing"></span></button>
+        <button class="s-btn"    onclick="setSort('margin',this)">Margin % <span class="s-arrow" id="sa-margin"></span></button>
+        <button class="s-btn"    onclick="setSort('time_billing',this)">Time Billing <span class="s-arrow" id="sa-time_billing"></span></button>
       </div>
     </div>
   </div>
@@ -215,113 +198,149 @@
 
 {% block scripts %}
 <script>
-var ALL_PROJECTS     = {{ projects | safe }};
-var DESIGNER_SUMMARY = {{ designer_summary | safe }};
-var tState = {des:'All', margin:'all', rev:'all', search:'', sort:'profit', dir:-1, filtered:null};
 // ═══════════════════════════════════════════════════════
-// DATE FILTER STATE + KPI RENDERING (clean rewrite)
+// OXFORD DASHBOARD — single-file script, clean rewrite
 // ═══════════════════════════════════════════════════════
 
-// dState.months is ALWAYS an array. Empty = all months.
+var ALL_PROJECTS = {{ projects | safe }};
+
+// Filter state
 var dState = { year: 'all', months: [] };
 
-// ── Filter: project data by current dState ──
-function filterByDate(projects) {
-  var hasYear   = dState.year !== 'all';
-  var hasMonth  = dState.months.length > 0;
-  if (!hasYear && !hasMonth) return projects;
-  return projects.map(function(p) {
-    var md = p.monthly_data || {};
-    var keys = Object.keys(md).filter(function(k) {
-      var parts = k.split('-');
-      if (hasYear  && parts[0] !== dState.year)               return false;
-      if (hasMonth && dState.months.indexOf(parts[1]) < 0)   return false;
-      return true;
-    });
-    if (!keys.length) return null;
-    var rev = 0, prof = 0, tb = 0;
-    keys.forEach(function(k) {
-      rev  += (md[k].revenue)      || 0;
-      prof += (md[k].profit)       || 0;
-      tb   += (md[k].time_billing) || 0;
-    });
-    var margin = rev > 0 ? Math.round(prof/rev*1000)/10 : 0;
-    return Object.assign({}, p, {revenue:rev, profit:prof, time_billing:tb, margin:margin});
-  }).filter(function(p) { return p !== null; });
+// Table state
+var tState = { des:'All', margin:'all', rev:'all', search:'', sort:'profit', dir:-1 };
+
+// Chart state
+var chart = null;
+var currentChartMode = 'profit';
+
+// Period comparison state
+var compareState = { periods: [], chartType: 'grouped', metric: 'profit' };
+var compareChart = null;
+var PERIOD_COLORS = ['#444735', '#b89653', '#353738', '#6b6f57', '#8a7444'];
+
+// ═══════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════
+
+function fmt(n) {
+  if (!n || n === 0) return '—';
+  if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  if (Math.abs(n) >= 1e3) return '$' + Math.round(n/1e3) + 'K';
+  return '$' + Math.round(n);
 }
 
-// ── Build context label for cards ──
+function monthName(mm) {
+  var names = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return names[parseInt(mm)] || '';
+}
+
+// ═══════════════════════════════════════════════════════
+// DATA: filter + aggregate
+// ═══════════════════════════════════════════════════════
+
+function filterByDate(projects) {
+  var noFilter = dState.year === 'all' && dState.months.length === 0;
+  if (noFilter) return projects;
+  var hasYear = dState.year !== 'all';
+  var hasMonths = dState.months.length > 0;
+  var out = [];
+  for (var i = 0; i < projects.length; i++) {
+    var p = projects[i];
+    var md = p.monthly_data || {};
+    var rev = 0, prof = 0, tb = 0, hit = false;
+    var keys = Object.keys(md);
+    for (var j = 0; j < keys.length; j++) {
+      var k = keys[j];
+      var parts = k.split('-');
+      if (hasYear   && parts[0] !== dState.year) continue;
+      if (hasMonths && dState.months.indexOf(parts[1]) < 0) continue;
+      rev  += md[k].revenue      || 0;
+      prof += md[k].profit       || 0;
+      tb   += md[k].time_billing || 0;
+      hit = true;
+    }
+    if (!hit) continue;
+    var margin = rev > 0 ? Math.round(prof/rev*1000)/10 : 0;
+    out.push(Object.assign({}, p, {revenue:rev, profit:prof, time_billing:tb, margin:margin}));
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════
+// KPI CARDS (always dynamic)
+// ═══════════════════════════════════════════════════════
+
 function filterLabel() {
   if (dState.year === 'all' && dState.months.length === 0) return 'All periods';
-  var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var parts = [];
   if (dState.months.length > 0) {
     var ms = dState.months.slice().sort();
-    if (ms.length <= 3) {
-      parts.push(ms.map(function(m) { return monthNames[parseInt(m)]; }).join(', '));
-    } else {
-      parts.push(ms.length + ' months');
-    }
+    parts.push(ms.length <= 3 ? ms.map(monthName).join(', ') : ms.length + ' months');
   }
   parts.push(dState.year === 'all' ? 'All years' : dState.year);
   return parts.join(' · ');
 }
 
-// ── Monthly series for sparkline (within current filter scope) ──
 function kpiMonthlySeries() {
-  var hasMonth = dState.months.length > 0;
-  var monthlyMap = {};
-  ALL_PROJECTS.forEach(function(p) {
-    var md = p.monthly_data || {};
-    Object.keys(md).forEach(function(k) {
+  // Returns arrays of values per month (in order) within the current filter scope
+  var hasMonths = dState.months.length > 0;
+  var byMonth = {};
+  for (var i = 0; i < ALL_PROJECTS.length; i++) {
+    var md = ALL_PROJECTS[i].monthly_data || {};
+    var keys = Object.keys(md);
+    for (var j = 0; j < keys.length; j++) {
+      var k = keys[j];
       var parts = k.split('-');
-      if (dState.year !== 'all' && parts[0] !== dState.year)     return;
-      if (hasMonth && dState.months.indexOf(parts[1]) < 0)       return;
-      if (!monthlyMap[k]) monthlyMap[k] = {revenue:0, profit:0, time_billing:0};
-      monthlyMap[k].revenue      += md[k].revenue      || 0;
-      monthlyMap[k].profit       += md[k].profit       || 0;
-      monthlyMap[k].time_billing += md[k].time_billing || 0;
-    });
-  });
-  var keys = Object.keys(monthlyMap).sort();
-  var rev = [], prof = [], tb = [], margin = [];
-  keys.forEach(function(k) {
-    var m = monthlyMap[k];
-    rev.push(m.revenue);
-    prof.push(m.profit);
-    tb.push(m.time_billing);
-    margin.push(m.revenue > 0 ? m.profit/m.revenue*100 : 0);
-  });
-  return {revenue: rev, profit: prof, time_billing: tb, margin: margin};
+      if (dState.year !== 'all' && parts[0] !== dState.year) continue;
+      if (hasMonths && dState.months.indexOf(parts[1]) < 0)  continue;
+      if (!byMonth[k]) byMonth[k] = {revenue:0, profit:0, time_billing:0};
+      byMonth[k].revenue      += md[k].revenue      || 0;
+      byMonth[k].profit       += md[k].profit       || 0;
+      byMonth[k].time_billing += md[k].time_billing || 0;
+    }
+  }
+  var keys = Object.keys(byMonth).sort();
+  var out = { revenue: [], profit: [], time_billing: [], margin: [] };
+  for (var i = 0; i < keys.length; i++) {
+    var m = byMonth[keys[i]];
+    out.revenue.push(m.revenue);
+    out.profit.push(m.profit);
+    out.time_billing.push(m.time_billing);
+    out.margin.push(m.revenue > 0 ? m.profit/m.revenue*100 : 0);
+  }
+  return out;
 }
 
-// ── Year-over-year comparison ──
-function kpiPriorYear() {
-  if (dState.year === 'all') return {};
+function kpiPriorYearDelta() {
+  // Compute YoY deltas if a specific year is selected
+  if (dState.year === 'all') return null;
+  var hasMonths = dState.months.length > 0;
   var priorYear = String(parseInt(dState.year) - 1);
-  var hasMonth  = dState.months.length > 0;
   var cur = {revenue:0, profit:0, time_billing:0};
   var pri = {revenue:0, profit:0, time_billing:0};
-  ALL_PROJECTS.forEach(function(p) {
-    var md = p.monthly_data || {};
-    Object.keys(md).forEach(function(k) {
+  for (var i = 0; i < ALL_PROJECTS.length; i++) {
+    var md = ALL_PROJECTS[i].monthly_data || {};
+    var keys = Object.keys(md);
+    for (var j = 0; j < keys.length; j++) {
+      var k = keys[j];
       var parts = k.split('-');
-      var y = parts[0], m = parts[1];
-      if (hasMonth && dState.months.indexOf(m) < 0) return;
-      var bucket = (y === dState.year) ? cur : (y === priorYear ? pri : null);
-      if (!bucket) return;
+      if (hasMonths && dState.months.indexOf(parts[1]) < 0) continue;
+      var bucket = (parts[0] === dState.year) ? cur : (parts[0] === priorYear ? pri : null);
+      if (!bucket) continue;
       bucket.revenue      += md[k].revenue      || 0;
       bucket.profit       += md[k].profit       || 0;
       bucket.time_billing += md[k].time_billing || 0;
-    });
-  });
+    }
+  }
   var curMargin = cur.revenue > 0 ? cur.profit/cur.revenue*100 : 0;
   var priMargin = pri.revenue > 0 ? pri.profit/pri.revenue*100 : 0;
+
   function cmp(c, p, isPct) {
     if (p === 0 && c === 0) return null;
     if (p === 0) return null;
     var d = isPct ? (c - p) : ((c - p) / Math.abs(p) * 100);
-    return {pct: d, isPct: isPct, prior: p, priorYear: priorYear};
+    return { pct: d, isPct: !!isPct, priorYear: priorYear };
   }
   return {
     revenue:      cmp(cur.revenue,      pri.revenue),
@@ -331,91 +350,273 @@ function kpiPriorYear() {
   };
 }
 
-// ── Sparkline SVG ──
-function sparkline(values, color) {
+function sparkline(values, colorHex) {
   if (!values || values.length < 2) return '';
   var w = 260, h = 44;
   var max = Math.max.apply(null, values);
   var min = Math.min.apply(null, values);
   var range = max - min || 1;
   var step = w / (values.length - 1);
-  var points = values.map(function(v, i) {
+  var pts = [];
+  for (var i = 0; i < values.length; i++) {
     var x = i * step;
-    var y = h - ((v - min) / range) * (h - 6) - 3;
-    return x.toFixed(1) + ',' + y.toFixed(1);
-  }).join(' ');
-  var areaPoints = '0,' + h + ' ' + points + ' ' + w + ',' + h;
-  var lastIdx = values.length - 1;
-  var lastX = (lastIdx * step).toFixed(1);
-  var lastY = (h - ((values[lastIdx] - min) / range) * (h - 6) - 3).toFixed(1);
+    var y = h - ((values[i] - min) / range) * (h - 6) - 3;
+    pts.push(x.toFixed(1) + ',' + y.toFixed(1));
+  }
+  var line = pts.join(' ');
+  var area = '0,' + h + ' ' + line + ' ' + w + ',' + h;
+  var lastX = ((values.length - 1) * step).toFixed(1);
+  var lastY = (h - ((values[values.length - 1] - min) / range) * (h - 6) - 3).toFixed(1);
   return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:100%;">' +
-    '<polygon points="' + areaPoints + '" fill="' + color + '" fill-opacity="0.08"/>' +
-    '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<circle cx="' + lastX + '" cy="' + lastY + '" r="3" fill="' + color + '"/>' +
+    '<polygon points="' + area + '" fill="' + colorHex + '" fill-opacity="0.10"/>' +
+    '<polyline points="' + line + '" fill="none" stroke="' + colorHex + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + lastX + '" cy="' + lastY + '" r="3" fill="' + colorHex + '"/>' +
   '</svg>';
 }
 
-// ── Single KPI card renderer ──
-function kpiCard(opts) {
-  // opts: {label, value, context, series, prior, accent, isPercent}
-  var color    = opts.accent ? 'var(--gold-dark)' : 'var(--deep-olive)';
-  var sparkHex = opts.accent ? '#b89653' : '#444735';
-  var spark    = opts.series && opts.series.length >= 2 ? sparkline(opts.series, sparkHex) : '';
+function renderKPIs(data) {
+  var totRev  = 0, totProf = 0, totTB = 0;
+  for (var i = 0; i < data.length; i++) {
+    totRev  += data[i].revenue      || 0;
+    totProf += data[i].profit       || 0;
+    totTB   += data[i].time_billing || 0;
+  }
+  var totMargin = totRev > 0 ? totProf/totRev*100 : 0;
 
-  // Trend indicator
+  var ctx    = filterLabel();
+  var series = kpiMonthlySeries();
+  var prior  = kpiPriorYearDelta();
+
+  var cards = [
+    { label:'Total Revenue',  value: fmt(totRev),             series: series.revenue,      prior: prior ? prior.revenue : null },
+    { label:'Total Profit',   value: fmt(totProf),            series: series.profit,       prior: prior ? prior.profit : null, accent:true },
+    { label:'Overall Margin', value: totMargin.toFixed(1)+'%',series: series.margin,       prior: prior ? prior.margin : null, isPercent:true },
+    { label:'Time Billing',   value: fmt(totTB),              series: series.time_billing, prior: prior ? prior.time_billing : null }
+  ];
+
+  var html = '';
+  for (var i = 0; i < cards.length; i++) {
+    html += kpiCardHtml(cards[i], ctx);
+  }
+  document.getElementById('kpiGrid').innerHTML = html;
+}
+
+function kpiCardHtml(c, ctx) {
+  var hex   = c.accent ? '#b89653' : '#444735';
+  var spark = (c.series && c.series.length >= 2) ? sparkline(c.series, hex) : '';
+
   var trend = '';
-  if (opts.prior && opts.prior.pct !== null && opts.prior.pct !== undefined) {
-    var dir = opts.prior.pct > 0.1 ? 'up' : (opts.prior.pct < -0.1 ? 'down' : 'flat');
-    var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
-    var v = opts.prior.isPct
-      ? Math.abs(opts.prior.pct).toFixed(1) + 'pts'
-      : Math.abs(opts.prior.pct).toFixed(0) + '%';
-    trend = '<div class="kpi-trend ' + dir + '">' +
-      '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + v + '</span>' +
-      '<span class="trend-meta">vs ' + opts.prior.priorYear + '</span>' +
-    '</div>';
-  } else if (opts.series && opts.series.length >= 2) {
-    var first = opts.series[0], last = opts.series[opts.series.length - 1];
-    if (Math.abs(first) > 0.001) {
-      var delta = opts.isPercent ? (last - first) : ((last - first) / Math.abs(first) * 100);
-      var dir = delta > 0.1 ? 'up' : (delta < -0.1 ? 'down' : 'flat');
-      var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
-      var v = opts.isPercent ? Math.abs(delta).toFixed(1) + 'pts' : Math.abs(delta).toFixed(0) + '%';
-      trend = '<div class="kpi-trend ' + dir + '">' +
-        '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + v + '</span>' +
-        '<span class="trend-meta">first → last</span>' +
-      '</div>';
+  var delta = null, label = '';
+  if (c.prior && c.prior.pct !== null && c.prior.pct !== undefined) {
+    delta = c.prior.pct; label = 'vs ' + c.prior.priorYear;
+    var v = c.prior.isPct ? Math.abs(delta).toFixed(1) + 'pts' : Math.abs(delta).toFixed(0) + '%';
+    trend = trendHtml(delta, v, label);
+  } else if (c.series && c.series.length >= 2) {
+    var a = c.series[0], b = c.series[c.series.length - 1];
+    if (Math.abs(a) > 0.01) {
+      delta = c.isPercent ? (b - a) : ((b - a) / Math.abs(a) * 100);
+      var v = c.isPercent ? Math.abs(delta).toFixed(1) + 'pts' : Math.abs(delta).toFixed(0) + '%';
+      trend = trendHtml(delta, v, 'first → last');
     }
   }
   if (!trend) trend = '<div class="kpi-trend flat"><span class="trend-meta">No comparison data</span></div>';
 
-  return '<div class="kpi-card' + (opts.accent ? ' accent' : '') + '">' +
-    '<p class="kpi-label">' + opts.label + '</p>' +
-    '<p class="kpi-value">' + opts.value + '</p>' +
-    '<p class="kpi-context">' + opts.context + '</p>' +
+  return '<div class="kpi-card' + (c.accent ? ' accent' : '') + '">' +
+    '<p class="kpi-label">' + c.label + '</p>' +
+    '<p class="kpi-value">' + c.value + '</p>' +
+    '<p class="kpi-context">' + ctx + '</p>' +
     '<div class="kpi-spark">' + spark + '</div>' +
     trend +
   '</div>';
 }
 
-// ── Main KPI renderer — one variant, always dynamic ──
-function renderKPIs(data) {
-  var totals = {
-    revenue:      data.reduce(function(s,p){return s+p.revenue;},0),
-    profit:       data.reduce(function(s,p){return s+p.profit;},0),
-    time_billing: data.reduce(function(s,p){return s+p.time_billing;},0)
-  };
-  totals.margin = totals.revenue > 0 ? totals.profit/totals.revenue*100 : 0;
+function trendHtml(delta, valStr, metaLabel) {
+  var dir = delta > 0.1 ? 'up' : (delta < -0.1 ? 'down' : 'flat');
+  var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
+  return '<div class="kpi-trend ' + dir + '">' +
+    '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + valStr + '</span>' +
+    '<span class="trend-meta">' + metaLabel + '</span>' +
+  '</div>';
+}
 
-  var ctx    = filterLabel();
-  var series = kpiMonthlySeries();
-  var prior  = kpiPriorYear();
+// ═══════════════════════════════════════════════════════
+// DESIGNER BARS
+// ═══════════════════════════════════════════════════════
 
-  document.getElementById('kpiGrid').innerHTML =
-    kpiCard({label:'Total Revenue',  value:fmt(totals.revenue),      context:ctx, series:series.revenue,      prior:prior.revenue}) +
-    kpiCard({label:'Total Profit',   value:fmt(totals.profit),       context:ctx, series:series.profit,       prior:prior.profit, accent:true}) +
-    kpiCard({label:'Overall Margin', value:totals.margin.toFixed(1)+'%', context:'Blended rate · '+ctx, series:series.margin, prior:prior.margin, isPercent:true}) +
-    kpiCard({label:'Time Billing',   value:fmt(totals.time_billing), context:ctx, series:series.time_billing, prior:prior.time_billing});
+function renderDesignerBars(data) {
+  var map = {};
+  for (var i = 0; i < data.length; i++) {
+    var p = data[i];
+    if (p.designer === 'Unassigned') continue;
+    if (!map[p.designer]) map[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0};
+    map[p.designer].revenue += p.revenue;
+    map[p.designer].profit  += p.profit;
+  }
+  var list = [];
+  for (var k in map) {
+    map[k].margin = map[k].revenue > 0 ? Math.round(map[k].profit/map[k].revenue*1000)/10 : 0;
+    list.push(map[k]);
+  }
+
+  var byRev = list.slice().sort(function(a,b){return b.revenue-a.revenue;});
+  var maxRev = byRev.length ? byRev[0].revenue : 1;
+  document.getElementById('revBars').innerHTML = byRev.map(function(d) {
+    var pct = (d.revenue/maxRev*100).toFixed(0);
+    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color+';"></div></div>' +
+      '<span class="des-num">'+fmt(d.revenue)+'</span></div>';
+  }).join('');
+
+  var byMar = list.slice().sort(function(a,b){return b.margin-a.margin;});
+  var maxMar = byMar.length ? Math.max(1, byMar[0].margin) : 1;
+  document.getElementById('marginBars').innerHTML = byMar.map(function(d) {
+    var pct = Math.max(0, Math.min(100, d.margin/maxMar*100)).toFixed(0);
+    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color+';opacity:0.8;"></div></div>' +
+      '<span class="des-pct" style="color:'+d.color+';">'+d.margin.toFixed(1)+'%</span></div>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// MAIN CHART (Comparative View)
+// ═══════════════════════════════════════════════════════
+
+function renderLegend(data) {
+  var map = {};
+  for (var i = 0; i < data.length; i++) {
+    var p = data[i];
+    if (p.designer === 'Unassigned' || map[p.designer]) continue;
+    map[p.designer] = {label:p.designer_label, color:p.color_hex};
+  }
+  var html = '';
+  for (var k in map) {
+    html += '<span class="leg-item"><span class="leg-dot" style="background:'+map[k].color+';"></span>'+map[k].label+'</span>';
+  }
+  document.getElementById('chartLegend').innerHTML = html;
+}
+
+function buildChart(mode, data) {
+  if (typeof Chart === 'undefined') return;
+  var map = {};
+  for (var i = 0; i < data.length; i++) {
+    var p = data[i];
+    if (p.designer === 'Unassigned') continue;
+    if (!map[p.designer]) map[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0, time_billing:0};
+    map[p.designer].revenue      += p.revenue;
+    map[p.designer].profit       += p.profit;
+    map[p.designer].time_billing += p.time_billing;
+  }
+  var list = [];
+  for (var k in map) {
+    map[k].margin = map[k].revenue > 0 ? Math.round(map[k].profit/map[k].revenue*1000)/10 : 0;
+    list.push(map[k]);
+  }
+  list.sort(function(a,b){return b.revenue-a.revenue;});
+
+  if (chart) { chart.destroy(); chart = null; }
+  var wrap = document.getElementById('mainChart').parentNode;
+  wrap.innerHTML = '<canvas id="mainChart"></canvas>';
+  if (!list.length) return;
+
+  var ctx = document.getElementById('mainChart').getContext('2d');
+  var labels = list.map(function(d){return d.label;});
+  var vals   = list.map(function(d){return d[mode] || 0;});
+  var fmtFn  = mode === 'margin' ? function(v){return v.toFixed(1)+'%';} : function(v){return fmt(v);};
+
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels:labels, datasets:[{
+      data: vals,
+      backgroundColor: list.map(function(d){return d.color + 'cc';}),
+      borderColor:     list.map(function(d){return d.color;}),
+      borderWidth: 1, borderRadius: 2, borderSkipped: 'bottom'
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {display:false},
+        tooltip: {
+          callbacks: {label: function(c){return ' ' + fmtFn(c.raw);}},
+          backgroundColor: 'rgba(53,55,56,0.94)', titleColor: '#d4b984', bodyColor: '#fcf8f3',
+          padding: 12, cornerRadius: 2
+        }
+      },
+      scales: {
+        x: { grid:{display:false}, border:{display:false}, ticks:{color:'#a8a8a9',font:{size:11}} },
+        y: { grid:{color:'rgba(53,55,56,0.05)'}, border:{display:false},
+             ticks:{color:'#a8a8a9', font:{size:11}, callback:function(v){return fmtFn(v);}} }
+      }
+    }
+  });
+  currentChartMode = mode;
+}
+
+function switchChart(mode, btn) {
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  currentChartMode = mode;
+  buildChart(mode, tState.filtered || ALL_PROJECTS);
+}
+
+// ═══════════════════════════════════════════════════════
+// TABLE
+// ═══════════════════════════════════════════════════════
+
+function buildDesFilterBtns(data) {
+  var row = document.getElementById('desFiltRow');
+  row.innerHTML = '<button class="f-btn on" onclick="setDesFilter(\'All\',this)">All</button>';
+  var seen = {};
+  for (var i = 0; i < data.length; i++) {
+    var p = data[i];
+    if (p.designer === 'Unassigned' || seen[p.designer]) continue;
+    seen[p.designer] = true;
+    var btn = document.createElement('button');
+    btn.className = 'f-btn';
+    btn.textContent = p.designer_label;
+    (function(dname){ btn.onclick = function() { setDesFilter(dname, this); }; })(p.designer);
+    row.appendChild(btn);
+  }
+}
+
+function renderTable() {
+  var source = tState.filtered || ALL_PROJECTS;
+  var rows = source.filter(function(p) {
+    if (tState.des !== 'All' && p.designer !== tState.des) return false;
+    if (tState.margin === 'high' && p.margin <= 50)  return false;
+    if (tState.margin === 'mid'  && (p.margin < 30 || p.margin > 50)) return false;
+    if (tState.margin === 'low'  && p.margin >= 30)  return false;
+    if (tState.rev === 'large' && p.revenue <= 500000) return false;
+    if (tState.rev === 'mid'   && (p.revenue < 100000 || p.revenue > 500000)) return false;
+    if (tState.rev === 'small' && p.revenue >= 100000) return false;
+    if (tState.search && p.client.toLowerCase().indexOf(tState.search) < 0) return false;
+    return true;
+  });
+  rows.sort(function(a,b) {
+    var av = tState.sort === 'client' ? a.client : (a[tState.sort] || 0);
+    var bv = tState.sort === 'client' ? b.client : (b[tState.sort] || 0);
+    return typeof av === 'string' ? tState.dir*av.localeCompare(bv) : tState.dir*(av-bv);
+  });
+  document.getElementById('resultCount').textContent = 'Showing ' + rows.length + ' of ' + source.length + ' projects';
+  var body = document.getElementById('tableBody');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="6" class="tbl-empty">No projects match the current filters.</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(function(p) {
+    var margin = parseFloat(p.margin) || 0;
+    var bw = Math.max(0, Math.min(100, margin));
+    var color = p.color_hex || '#888888';
+    return '<tr>' +
+      '<td><a href="/clients/' + (p.client_id||'') + '" class="c-link"><div class="c-name">' + (p.client||'') + '</div></a></td>' +
+      '<td><span class="des-pill" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '44;">' + (p.designer_label||'—') + '</span></td>' +
+      '<td class="r">' + fmt(p.revenue) + '</td>' +
+      '<td class="r' + (p.profit<0?' neg':'') + '">' + fmt(p.profit) + '</td>' +
+      '<td class="r">' + (p.time_billing>0 ? fmt(p.time_billing) : '—') + '</td>' +
+      '<td class="r"><div class="bar-cell">' +
+        '<div class="mini-bar"><div class="mini-fill" style="width:'+bw+'%;background:'+color+';"></div></div>' +
+        '<span class="pct-num'+(margin<0?' neg':'')+'">' + margin.toFixed(1) + '%</span>' +
+      '</div></td></tr>';
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -424,28 +625,29 @@ function renderKPIs(data) {
 
 function buildYearBtns() {
   var years = {};
-  ALL_PROJECTS.forEach(function(p) {
-    Object.keys(p.monthly_data || {}).forEach(function(k) { years[k.split('-')[0]] = true; });
-  });
+  for (var i = 0; i < ALL_PROJECTS.length; i++) {
+    var md = ALL_PROJECTS[i].monthly_data || {};
+    var keys = Object.keys(md);
+    for (var j = 0; j < keys.length; j++) years[keys[j].split('-')[0]] = true;
+  }
   var yearList = Object.keys(years).sort();
   if (!yearList.length) return;
-  var row = document.getElementById('yearRow');
   var html = '<button class="f-btn on" data-y="all" onclick="setYear(\'all\',this)">All</button>';
-  yearList.forEach(function(y) {
+  for (var i = 0; i < yearList.length; i++) {
+    var y = yearList[i];
     html += '<button class="f-btn" data-y="' + y + '" onclick="setYear(\'' + y + '\',this)">' + y + '</button>';
-  });
-  row.innerHTML = html;
+  }
+  document.getElementById('yearRow').innerHTML = html;
   document.getElementById('dateFilterBar').style.display = 'flex';
 }
 
 function setYear(val, btn) {
   dState.year = val;
-  document.querySelectorAll('#yearRow .f-btn').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('#yearRow .f-btn').forEach(function(b){b.classList.remove('on');});
   btn.classList.add('on');
   refreshAll();
 }
 
-// ── Presets (All, YTD, Q1-4, H1-2) ──
 function setPreset(name, btn) {
   if (name === 'all') {
     dState.months = [];
@@ -460,21 +662,17 @@ function setPreset(name, btn) {
   else if (name === 'q4')   dState.months = ['10','11','12'];
   else if (name === 'h1')   dState.months = ['01','02','03','04','05','06'];
   else if (name === 'h2')   dState.months = ['07','08','09','10','11','12'];
-  // Highlight active preset
-  document.querySelectorAll('#presetRow .f-btn').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('#presetRow .f-btn').forEach(function(b){b.classList.remove('on');});
   btn.classList.add('on');
   syncMonthButtons();
   refreshAll();
 }
 
-// ── Multi-select individual months ──
 function toggleMonth(m, btn) {
   var idx = dState.months.indexOf(m);
   if (idx >= 0) dState.months.splice(idx, 1);
   else          dState.months.push(m);
-  // Deactivate preset buttons (user went manual)
-  document.querySelectorAll('#presetRow .f-btn').forEach(function(b){ b.classList.remove('on'); });
-  // If no months selected, highlight "All" preset
+  document.querySelectorAll('#presetRow .f-btn').forEach(function(b){b.classList.remove('on');});
   if (dState.months.length === 0) {
     var allBtn = document.querySelector('#presetRow .f-btn[data-p="all"]');
     if (allBtn) allBtn.classList.add('on');
@@ -493,37 +691,23 @@ function syncMonthButtons() {
 
 function clearDateFilters() {
   dState = {year:'all', months:[]};
-  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn, #presetRow .f-btn').forEach(function(b){
-    b.classList.remove('on');
-  });
-  var ally = document.querySelector('#yearRow .f-btn[data-y="all"]'); if (ally) ally.classList.add('on');
-  var allp = document.querySelector('#presetRow .f-btn[data-p="all"]'); if (allp) allp.classList.add('on');
+  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn, #presetRow .f-btn').forEach(function(b){b.classList.remove('on');});
+  var a = document.querySelector('#yearRow .f-btn[data-y="all"]');  if (a) a.classList.add('on');
+  var b = document.querySelector('#presetRow .f-btn[data-p="all"]'); if (b) b.classList.add('on');
   refreshAll();
 }
 
-function refreshAll() {
-  var filtered = filterByDate(ALL_PROJECTS);
-  tState.filtered = filtered;
-  renderKPIs(filtered);
-  renderDesignerBars(filtered);
-  renderLegend(filtered);
-  buildChart(currentChartMode, filtered);
-  renderTable();
-  buildDesFilterBtns(filtered);
-  // Also refresh the compare chart if there are configured periods
-  if (compareState && compareState.periods && compareState.periods.length > 0) {
-    renderCompareChart();
-  }
-}
+// ═══════════════════════════════════════════════════════
+// TABLE CONTROLS
+// ═══════════════════════════════════════════════════════
 
-// ── Table filter controls ──
-function activateBtn(btn, rowId, color) {
-  document.querySelectorAll(rowId + ' .f-btn').forEach(function(b){ b.classList.remove('on'); });
+function activate(btn, rowId) {
+  document.querySelectorAll(rowId + ' .f-btn').forEach(function(b){b.classList.remove('on');});
   btn.classList.add('on');
 }
-function setDesFilter(val, btn) { tState.des=val; activateBtn(btn,'#desFiltRow'); renderTable(); }
-function setFilt(type, val, btn, rowId) { tState[type]=val; activateBtn(btn,rowId); renderTable(); }
-function doSearch(v) { tState.search=v.toLowerCase(); renderTable(); }
+function setDesFilter(v, btn) { tState.des=v;  activate(btn,'#desFiltRow'); renderTable(); }
+function setFilt(k, v, btn, id){ tState[k]=v;  activate(btn,id);            renderTable(); }
+function doSearch(v)           { tState.search=v.toLowerCase();             renderTable(); }
 function setSort(key, btn) {
   tState.dir = tState.sort===key ? tState.dir*-1 : (key==='client'?1:-1);
   tState.sort = key;
@@ -535,67 +719,41 @@ function setSort(key, btn) {
   renderTable();
 }
 
-// ── PERIOD COMPARISON ──────────────────────────────────────────
-var compareState = {
-  periods: [],
-  chartType: 'grouped',
-  metric: 'profit'
-};
-var compareChart = null;
-var PERIOD_COLORS = ['#444735', '#6b5540', '#8a8e73', '#353738', '#9e7e52'];
+// ═══════════════════════════════════════════════════════
+// PERIOD COMPARISON
+// ═══════════════════════════════════════════════════════
 
 function getAvailableYears() {
   var years = {};
-  ALL_PROJECTS.forEach(function(p) {
-    Object.keys(p.monthly_data || {}).forEach(function(k) { years[k.split('-')[0]] = true; });
-  });
+  for (var i = 0; i < ALL_PROJECTS.length; i++) {
+    var md = ALL_PROJECTS[i].monthly_data || {};
+    var keys = Object.keys(md);
+    for (var j = 0; j < keys.length; j++) years[keys[j].split('-')[0]] = true;
+  }
   return Object.keys(years).sort();
 }
 
-function initComparePeriods() {
+function yearOptionsHtml(sel) {
   var years = getAvailableYears();
-  // Latest 3 years, newest first
-  compareState.periods = years.slice(-3).reverse().map(function(y) {
-    return {year: y, preset: 'full', monthFrom: '01', monthTo: '12'};
-  });
-  if (!compareState.periods.length) compareState.periods = [{year:'all', preset:'full', monthFrom:'01', monthTo:'12'}];
-}
-
-function yearOptionsHtml(selected) {
-  var years = getAvailableYears();
-  var html = '<option value="all"' + (selected === 'all' ? ' selected' : '') + '>All years</option>';
-  years.forEach(function(y) {
-    html += '<option value="' + y + '"' + (selected === y ? ' selected' : '') + '>' + y + '</option>';
-  });
+  var html = '<option value="all"' + (sel==='all'?' selected':'') + '>All years</option>';
+  for (var i = 0; i < years.length; i++) {
+    html += '<option value="' + years[i] + '"' + (sel===years[i]?' selected':'') + '>' + years[i] + '</option>';
+  }
   return html;
 }
 
-function monthOptionsHtml(selected) {
-  var groups = [
-    {label: '', items: [['all','All months'], ['ytd','YTD (through today)']]},
-    {label: 'Quarters', items: [
-      ['q1','Q1 (Jan–Mar)'], ['q2','Q2 (Apr–Jun)'], ['q3','Q3 (Jul–Sep)'], ['q4','Q4 (Oct–Dec)']
-    ]},
-    {label: 'Halves', items: [
-      ['h1','H1 (Jan–Jun)'], ['h2','H2 (Jul–Dec)']
-    ]},
-    {label: 'Individual months', items: [
-      ['01','Jan'],['02','Feb'],['03','Mar'],['04','Apr'],['05','May'],['06','Jun'],
-      ['07','Jul'],['08','Aug'],['09','Sep'],['10','Oct'],['11','Nov'],['12','Dec']
-    ]}
+function monthOptionsHtml(sel) {
+  var items = [
+    ['all','All months'],['ytd','YTD'],
+    ['q1','Q1'],['q2','Q2'],['q3','Q3'],['q4','Q4'],['h1','H1'],['h2','H2'],
+    ['01','Jan'],['02','Feb'],['03','Mar'],['04','Apr'],['05','May'],['06','Jun'],
+    ['07','Jul'],['08','Aug'],['09','Sep'],['10','Oct'],['11','Nov'],['12','Dec']
   ];
-  var html = '';
-  groups.forEach(function(g) {
-    if (g.label) html += '<optgroup label="' + g.label + '">';
-    g.items.forEach(function(m) {
-      html += '<option value="' + m[0] + '"' + (selected === m[0] ? ' selected' : '') + '>' + m[1] + '</option>';
-    });
-    if (g.label) html += '</optgroup>';
-  });
-  return html;
+  return items.map(function(it){
+    return '<option value="'+it[0]+'"'+(sel===it[0]?' selected':'')+'>'+it[1]+'</option>';
+  }).join('');
 }
 
-// Resolves a period month field to an array of "01"-"12" strings (or null = all)
 function resolveMonths(period) {
   var m = period.month;
   if (!m || m === 'all') return null;
@@ -606,116 +764,49 @@ function resolveMonths(period) {
   if (m === 'h1') return ['01','02','03','04','05','06'];
   if (m === 'h2') return ['07','08','09','10','11','12'];
   if (m === 'ytd') {
-    var now = new Date();
-    var cur = now.getMonth() + 1;
+    var cur = (new Date()).getMonth() + 1;
     var out = [];
-    for (var i = 1; i <= cur; i++) {
-      out.push(i < 10 ? '0' + i : '' + i);
-    }
+    for (var i = 1; i <= cur; i++) out.push(i < 10 ? '0'+i : ''+i);
     return out;
   }
-  return [m];  // single month
+  return [m];
+}
+
+function periodLabel(period) {
+  var m = period.month, prefix = '';
+  if (!m || m === 'all') prefix = '';
+  else if (m === 'ytd') prefix = 'YTD ';
+  else if (['q1','q2','q3','q4','h1','h2'].indexOf(m) >= 0) prefix = m.toUpperCase() + ' ';
+  else if (/^\d{2}$/.test(m)) prefix = monthName(m) + ' ';
+  return prefix + (period.year === 'all' ? 'All' : period.year);
 }
 
 function renderComparePeriods() {
   var html = compareState.periods.map(function(p, idx) {
     var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
-    var showRange = p.preset === 'range';
     return '<div class="compare-period-row">' +
       '<span class="period-color" style="background:' + color + ';"></span>' +
-      '<select class="compare-select" data-idx="' + idx + '" data-key="year" onchange="updateComparePeriod(this)">' +
-        yearOptionsHtml(p.year) +
-      '</select>' +
-      '<select class="compare-select" data-idx="' + idx + '" data-key="preset" onchange="updateComparePeriod(this)">' +
-        presetOptionsHtml(p.preset) +
-      '</select>' +
-      (showRange
-        ? '<select class="compare-select compare-range" data-idx="' + idx + '" data-key="monthFrom" onchange="updateComparePeriod(this)">' +
-            monthOptionsPlain(p.monthFrom) +
-          '</select>' +
-          '<span class="range-dash">to</span>' +
-          '<select class="compare-select compare-range" data-idx="' + idx + '" data-key="monthTo" onchange="updateComparePeriod(this)">' +
-            monthOptionsPlain(p.monthTo) +
-          '</select>'
-        : '') +
-      (compareState.periods.length > 1 ?
-        '<button class="x-btn" title="Remove" onclick="removeComparePeriod(' + idx + ')">×</button>' : '') +
-      '</div>';
+      '<select class="compare-select" data-idx="'+idx+'" data-key="year" onchange="updateComparePeriod(this)">' + yearOptionsHtml(p.year) + '</select>' +
+      '<select class="compare-select" data-idx="'+idx+'" data-key="month" onchange="updateComparePeriod(this)">' + monthOptionsHtml(p.month) + '</select>' +
+      '<button class="x-btn" title="Remove" onclick="removeComparePeriod('+idx+')">×</button>' +
+    '</div>';
   }).join('');
+  if (!html) html = '<p style="color:var(--ink-xlight);font-size:12px;font-style:italic;">Click "+ Add period" to start comparing.</p>';
   document.getElementById('comparePeriods').innerHTML = html;
-}
-
-function presetOptionsHtml(selected) {
-  var presets = [
-    ['full','Full year'],
-    ['ytd','YTD'],
-    ['q1','Q1 (Jan–Mar)'],
-    ['q2','Q2 (Apr–Jun)'],
-    ['q3','Q3 (Jul–Sep)'],
-    ['q4','Q4 (Oct–Dec)'],
-    ['h1','H1 (Jan–Jun)'],
-    ['h2','H2 (Jul–Dec)'],
-    ['range','Custom range…']
-  ];
-  return presets.map(function(p) {
-    return '<option value="' + p[0] + '"' + (selected === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
-  }).join('');
-}
-
-function monthOptionsPlain(selected) {
-  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
-  var names  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return months.map(function(m, i) {
-    return '<option value="' + m + '"' + (selected === m ? ' selected' : '') + '>' + names[i] + '</option>';
-  }).join('');
-}
-
-// Resolve a period's preset into a [fromMonth, toMonth] range
-function getPeriodRange(period) {
-  var now = new Date();
-  var currentMonth = (now.getMonth() + 1); // 1-12
-  var mm = function(n) { return n < 10 ? '0' + n : '' + n; };
-  switch (period.preset) {
-    case 'ytd':   return ['01', mm(currentMonth)];
-    case 'q1':    return ['01', '03'];
-    case 'q2':    return ['04', '06'];
-    case 'q3':    return ['07', '09'];
-    case 'q4':    return ['10', '12'];
-    case 'h1':    return ['01', '06'];
-    case 'h2':    return ['07', '12'];
-    case 'range': return [period.monthFrom || '01', period.monthTo || '12'];
-    default:      return ['01', '12']; // full year
-  }
-}
-
-function monthInRange(key, fromMonth, toMonth) {
-  var m = key.split('-')[1];
-  return m >= fromMonth && m <= toMonth;
 }
 
 function updateComparePeriod(sel) {
   var idx = parseInt(sel.dataset.idx);
-  var key = sel.dataset.key;
-  compareState.periods[idx][key] = sel.value;
-  // If preset changed to/from range, re-render the row to show/hide range inputs
-  if (key === 'preset') {
-    renderComparePeriods();
-  }
+  compareState.periods[idx][sel.dataset.key] = sel.value;
   renderCompareChart();
 }
 
 function addComparePeriod() {
-  if (compareState.periods.length >= 5) {
-    alert('Maximum 5 periods for comparison.');
-    return;
-  }
+  if (compareState.periods.length >= 5) { alert('Maximum 5 periods.'); return; }
+  var years = getAvailableYears();
+  var defYear = years.length ? years[years.length - 1] : 'all';
   var last = compareState.periods[compareState.periods.length - 1];
-  compareState.periods.push({
-    year: last ? last.year : 'all',
-    preset: last ? last.preset : 'full',
-    monthFrom: last ? last.monthFrom : '01',
-    monthTo:   last ? last.monthTo   : '12'
-  });
+  compareState.periods.push({ year: last ? last.year : defYear, month: last ? last.month : 'all' });
   renderComparePeriods();
   renderCompareChart();
 }
@@ -726,123 +817,104 @@ function removeComparePeriod(idx) {
   renderCompareChart();
 }
 
-function setCompareChartType(type, btn) {
-  compareState.chartType = type;
-  document.querySelectorAll('#cmpChartRow .f-btn').forEach(function(b){b.classList.remove('on');});
-  btn.classList.add('on');
+function setCompareChartType(t, btn) {
+  compareState.chartType = t;
+  activate(btn, '#cmpChartRow');
   renderCompareChart();
 }
-
-function setCompareMetric(metric, btn) {
-  compareState.metric = metric;
-  document.querySelectorAll('#cmpMetricRow .f-btn').forEach(function(b){b.classList.remove('on');});
-  btn.classList.add('on');
+function setCompareMetric(m, btn) {
+  compareState.metric = m;
+  activate(btn, '#cmpMetricRow');
   renderCompareChart();
 }
 
 function aggregatePeriodByDesigner(period) {
-  var range = getPeriodRange(period);
+  var months = resolveMonths(period);
   var desMap = {};
-  ALL_PROJECTS.forEach(function(p) {
-    if (p.designer === 'Unassigned') return;
+  for (var i = 0; i < ALL_PROJECTS.length; i++) {
+    var p = ALL_PROJECTS[i];
+    if (p.designer === 'Unassigned') continue;
     var md = p.monthly_data || {};
+    var keys = Object.keys(md);
     var rev = 0, prof = 0, tb = 0;
-    Object.keys(md).forEach(function(k) {
-      var parts = k.split('-');
-      if (period.year !== 'all' && parts[0] !== period.year) return;
-      if (!monthInRange(k, range[0], range[1])) return;
+    for (var j = 0; j < keys.length; j++) {
+      var k = keys[j], parts = k.split('-');
+      if (period.year !== 'all' && parts[0] !== period.year) continue;
+      if (months && months.indexOf(parts[1]) < 0) continue;
       rev  += md[k].revenue      || 0;
       prof += md[k].profit       || 0;
       tb   += md[k].time_billing || 0;
-    });
-    if (rev === 0 && prof === 0 && tb === 0) return;
-    if (!desMap[p.designer]) {
-      desMap[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0, time_billing:0};
     }
+    if (rev === 0 && prof === 0 && tb === 0) continue;
+    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0, time_billing:0};
     desMap[p.designer].revenue      += rev;
     desMap[p.designer].profit       += prof;
     desMap[p.designer].time_billing += tb;
-  });
-  Object.values(desMap).forEach(function(d) {
+  }
+  for (var k in desMap) {
+    var d = desMap[k];
     d.margin = d.revenue > 0 ? Math.round(d.profit/d.revenue*1000)/10 : 0;
-  });
+  }
   return desMap;
 }
 
 function aggregatePeriodByMonth(period) {
-  var range = getPeriodRange(period);
   var monthMap = {};
   for (var i = 1; i <= 12; i++) {
-    var m = i < 10 ? '0' + i : '' + i;
+    var m = i < 10 ? '0'+i : ''+i;
     monthMap[m] = {revenue:0, profit:0, time_billing:0};
   }
-  ALL_PROJECTS.forEach(function(p) {
-    var md = p.monthly_data || {};
-    Object.keys(md).forEach(function(k) {
-      var parts = k.split('-');
-      if (period.year !== 'all' && parts[0] !== period.year) return;
-      if (!monthInRange(k, range[0], range[1])) return;
-      var month = parts[1];
-      if (!monthMap[month]) return;
-      monthMap[month].revenue      += md[k].revenue      || 0;
-      monthMap[month].profit       += md[k].profit       || 0;
-      monthMap[month].time_billing += md[k].time_billing || 0;
-    });
-  });
-  Object.values(monthMap).forEach(function(m) {
+  for (var i = 0; i < ALL_PROJECTS.length; i++) {
+    var md = ALL_PROJECTS[i].monthly_data || {};
+    var keys = Object.keys(md);
+    for (var j = 0; j < keys.length; j++) {
+      var k = keys[j], parts = k.split('-');
+      if (period.year !== 'all' && parts[0] !== period.year) continue;
+      var m = parts[1];
+      if (!monthMap[m]) continue;
+      monthMap[m].revenue      += md[k].revenue      || 0;
+      monthMap[m].profit       += md[k].profit       || 0;
+      monthMap[m].time_billing += md[k].time_billing || 0;
+    }
+  }
+  for (var k in monthMap) {
+    var m = monthMap[k];
     m.margin = m.revenue > 0 ? Math.round(m.profit/m.revenue*1000)/10 : 0;
-  });
+  }
   return monthMap;
 }
 
-function periodLabel(period) {
-  var y = period.year === 'all' ? 'All' : period.year;
-  var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var presetLabel = {
-    full: '', ytd: 'YTD ', q1: 'Q1 ', q2: 'Q2 ', q3: 'Q3 ', q4: 'Q4 ',
-    h1: 'H1 ', h2: 'H2 '
+function compareTooltip() {
+  return {
+    backgroundColor: 'rgba(53,55,56,0.94)', titleColor: '#d4b984',
+    bodyColor: '#fcf8f3', padding: 12, cornerRadius: 2
   };
-  if (period.preset === 'range') {
-    var from = monthNames[parseInt(period.monthFrom || '01')];
-    var to   = monthNames[parseInt(period.monthTo   || '12')];
-    return from + '–' + to + ' ' + y;
-  }
-  return (presetLabel[period.preset] || '') + y;
 }
 
-function compareFmtFn(metric) {
-  return metric === 'margin'
-    ? function(v) { return (v || 0).toFixed(1) + '%'; }
-    : function(v) { return fmt(v); };
-}
-
-function commonCompareOptions(fmtFn, stacked) {
+function compareOpts(fmtFn, stacked) {
   return {
     responsive: true, maintainAspectRatio: false,
     plugins: {
-      legend: {
-        display: true, position: 'bottom',
-        labels: { color: '#6b6c6d', font: { size: 11 }, boxWidth: 12, padding: 12 }
-      },
-      tooltip: {
-        callbacks: { label: function(c) { return c.dataset.label + ': ' + fmtFn(c.raw); } },
-        backgroundColor: 'rgba(53,55,56,0.94)', titleColor: '#a8a8a9', bodyColor: '#f7f4ee',
-        padding: 12, cornerRadius: 2
-      }
+      legend: { display: true, position: 'bottom', labels: {color:'#6b6c6d', font:{size:11}, boxWidth:12, padding:14} },
+      tooltip: Object.assign({}, compareTooltip(), {
+        callbacks: { label: function(c){return c.dataset.label + ': ' + fmtFn(c.raw);} }
+      })
     },
     scales: {
-      x: {
-        stacked: stacked || false,
-        grid: { display: false }, border: { display: false },
-        ticks: { color: '#a8a8a9', font: { size: 11 } }
-      },
-      y: {
-        stacked: stacked || false,
-        grid: { color: 'rgba(68,71,53,0.06)' }, border: { display: false },
-        ticks: { color: '#a8a8a9', font: { size: 11 }, callback: function(v){ return fmtFn(v); } }
-      }
+      x: { stacked: !!stacked, grid:{display:false}, border:{display:false}, ticks:{color:'#a8a8a9', font:{size:11}} },
+      y: { stacked: !!stacked, grid:{color:'rgba(53,55,56,0.05)'}, border:{display:false},
+           ticks:{color:'#a8a8a9', font:{size:11}, callback:function(v){return fmtFn(v);}} }
     }
   };
+}
+
+function drawCompareEmpty(canvas, msg) {
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.font = '12px "Inter", sans-serif';
+  ctx.fillStyle = '#a8a8a9';
+  ctx.textAlign = 'center';
+  ctx.fillText(msg || 'Click "+ Add period" to compare', canvas.width/2, canvas.height/2);
 }
 
 function renderCompareChart() {
@@ -850,104 +922,117 @@ function renderCompareChart() {
   if (compareChart) { compareChart.destroy(); compareChart = null; }
   var wrap = document.getElementById('compareChart').parentNode;
   wrap.innerHTML = '<canvas id="compareChart"></canvas>';
-  var ctx = document.getElementById('compareChart').getContext('2d');
+  var canvas = document.getElementById('compareChart');
+  if (!compareState.periods.length) {
+    drawCompareEmpty(canvas);
+    document.getElementById('compareLegend').innerHTML = '';
+    return;
+  }
+  var ctx = canvas.getContext('2d');
+  if (compareState.chartType === 'line') renderCompareLine(ctx);
+  else if (compareState.chartType === 'stacked') renderCompareStacked(ctx);
+  else renderCompareGrouped(ctx);
 
-  if (compareState.chartType === 'line') renderCompareLineChart(ctx);
-  else if (compareState.chartType === 'stacked') renderCompareStackedChart(ctx);
-  else renderCompareGroupedChart(ctx);
+  // Legend
+  var html = compareState.periods.map(function(p, idx) {
+    var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
+    return '<span class="leg-item"><span class="leg-dot" style="background:'+color+';"></span>'+periodLabel(p)+'</span>';
+  }).join('');
+  document.getElementById('compareLegend').innerHTML = html;
 }
 
-function renderCompareGroupedChart(ctx) {
+function renderCompareGrouped(ctx) {
   var periodData = compareState.periods.map(aggregatePeriodByDesigner);
-  var allDes = {};
-  periodData.forEach(function(pd) {
-    Object.keys(pd).forEach(function(d) { if (!allDes[d]) allDes[d] = pd[d]; });
-  });
-  var desKeys = Object.keys(allDes);
-  if (!desKeys.length) { drawNoData(ctx); return; }
-  var desLabels = desKeys.map(function(d) { return allDes[d].label; });
-
+  var all = {};
+  for (var i = 0; i < periodData.length; i++) {
+    for (var k in periodData[i]) if (!all[k]) all[k] = periodData[i][k];
+  }
+  var desKeys = Object.keys(all);
+  if (!desKeys.length) { drawCompareEmpty(document.getElementById('compareChart'), 'No data for selected periods'); return; }
   var metric = compareState.metric;
   var datasets = compareState.periods.map(function(p, idx) {
-    var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
-    var pd = periodData[idx];
+    var c = PERIOD_COLORS[idx % PERIOD_COLORS.length];
     return {
       label: periodLabel(p),
-      data: desKeys.map(function(d) { return (pd[d] || {})[metric] || 0; }),
-      backgroundColor: color + 'cc', borderColor: color,
-      borderWidth: 1, borderRadius: 2
+      data: desKeys.map(function(d){ return (periodData[idx][d] || {})[metric] || 0; }),
+      backgroundColor: c + 'cc', borderColor: c, borderWidth: 1, borderRadius: 2
     };
   });
-  var fmtFn = compareFmtFn(metric);
+  var fmtFn = metric === 'margin' ? function(v){return (v||0).toFixed(1)+'%';} : function(v){return fmt(v);};
   compareChart = new Chart(ctx, {
     type: 'bar',
-    data: { labels: desLabels, datasets: datasets },
-    options: commonCompareOptions(fmtFn, false)
+    data: { labels: desKeys.map(function(d){return all[d].label;}), datasets: datasets },
+    options: compareOpts(fmtFn, false)
   });
 }
 
-function renderCompareStackedChart(ctx) {
+function renderCompareStacked(ctx) {
   var periodData = compareState.periods.map(aggregatePeriodByDesigner);
-  var allDes = {};
-  periodData.forEach(function(pd) {
-    Object.keys(pd).forEach(function(d) { if (!allDes[d]) allDes[d] = pd[d]; });
-  });
-  var desKeys = Object.keys(allDes);
-  if (!desKeys.length) { drawNoData(ctx); return; }
-  var desLabels = desKeys.map(function(d) { return allDes[d].label; });
-
+  var all = {};
+  for (var i = 0; i < periodData.length; i++) {
+    for (var k in periodData[i]) if (!all[k]) all[k] = periodData[i][k];
+  }
+  var desKeys = Object.keys(all);
+  if (!desKeys.length) { drawCompareEmpty(document.getElementById('compareChart'), 'No data for selected periods'); return; }
   var metric = compareState.metric;
   var datasets = compareState.periods.map(function(p, idx) {
-    var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
-    var pd = periodData[idx];
+    var c = PERIOD_COLORS[idx % PERIOD_COLORS.length];
     return {
       label: periodLabel(p),
-      data: desKeys.map(function(d) { return (pd[d] || {})[metric] || 0; }),
-      backgroundColor: color + 'cc', borderColor: color, borderWidth: 1
+      data: desKeys.map(function(d){ return (periodData[idx][d] || {})[metric] || 0; }),
+      backgroundColor: c + 'cc', borderColor: c, borderWidth: 1
     };
   });
-  var fmtFn = compareFmtFn(metric);
+  var fmtFn = metric === 'margin' ? function(v){return (v||0).toFixed(1)+'%';} : function(v){return fmt(v);};
   compareChart = new Chart(ctx, {
     type: 'bar',
-    data: { labels: desLabels, datasets: datasets },
-    options: commonCompareOptions(fmtFn, true)
+    data: { labels: desKeys.map(function(d){return all[d].label;}), datasets: datasets },
+    options: compareOpts(fmtFn, true)
   });
 }
 
-function renderCompareLineChart(ctx) {
+function renderCompareLine(ctx) {
   var monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var metric = compareState.metric;
-
   var datasets = compareState.periods.map(function(p, idx) {
-    var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
-    var monthData = aggregatePeriodByMonth(p);
-    var vals = ['01','02','03','04','05','06','07','08','09','10','11','12'].map(function(m) {
-      return (monthData[m] || {})[metric] || 0;
-    });
+    var c = PERIOD_COLORS[idx % PERIOD_COLORS.length];
+    var mData = aggregatePeriodByMonth({year:p.year, month:'all'});
+    var vals = ['01','02','03','04','05','06','07','08','09','10','11','12'].map(function(m){ return (mData[m]||{})[metric]||0; });
     return {
       label: p.year === 'all' ? 'All years' : p.year,
       data: vals,
-      borderColor: color, backgroundColor: color + '22',
+      borderColor: c, backgroundColor: c+'22',
       borderWidth: 2.5, tension: 0.25, fill: false,
-      pointRadius: 3, pointBackgroundColor: color
+      pointRadius: 3, pointBackgroundColor: c
     };
   });
-  var fmtFn = compareFmtFn(metric);
+  var fmtFn = metric === 'margin' ? function(v){return (v||0).toFixed(1)+'%';} : function(v){return fmt(v);};
   compareChart = new Chart(ctx, {
     type: 'line',
     data: { labels: monthLabels, datasets: datasets },
-    options: commonCompareOptions(fmtFn, false)
+    options: compareOpts(fmtFn, false)
   });
 }
 
-function drawNoData(ctx) {
-  ctx.font = '14px Inter, sans-serif';
-  ctx.fillStyle = '#a8a8a9';
-  ctx.textAlign = 'center';
-  ctx.fillText('No data for selected periods', ctx.canvas.width / 2, ctx.canvas.height / 2);
+// ═══════════════════════════════════════════════════════
+// MASTER REFRESH
+// ═══════════════════════════════════════════════════════
+
+function refreshAll() {
+  var filtered = filterByDate(ALL_PROJECTS);
+  tState.filtered = filtered;
+  renderKPIs(filtered);
+  renderDesignerBars(filtered);
+  renderLegend(filtered);
+  buildChart(currentChartMode, filtered);
+  renderTable();
+  buildDesFilterBtns(filtered);
 }
 
-// ── Init ──
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+
 if (ALL_PROJECTS.length) {
   tState.filtered = ALL_PROJECTS;
   renderKPIs(ALL_PROJECTS);
@@ -957,7 +1042,6 @@ if (ALL_PROJECTS.length) {
   renderTable();
   buildDesFilterBtns(ALL_PROJECTS);
   buildYearBtns();
-  initComparePeriods();
   renderComparePeriods();
   renderCompareChart();
 }
