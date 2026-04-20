@@ -40,21 +40,33 @@
     <div class="btn-row" id="yearRow"></div>
   </div>
   <div class="date-filter-group">
-    <span class="tg-label">Month</span>
+    <span class="tg-label">Presets</span>
+    <div class="btn-row" id="presetRow">
+      <button class="f-btn on" data-p="all" onclick="setPreset('all',this)">All</button>
+      <button class="f-btn"    data-p="ytd" onclick="setPreset('ytd',this)">YTD</button>
+      <button class="f-btn"    data-p="q1"  onclick="setPreset('q1',this)">Q1</button>
+      <button class="f-btn"    data-p="q2"  onclick="setPreset('q2',this)">Q2</button>
+      <button class="f-btn"    data-p="q3"  onclick="setPreset('q3',this)">Q3</button>
+      <button class="f-btn"    data-p="q4"  onclick="setPreset('q4',this)">Q4</button>
+      <button class="f-btn"    data-p="h1"  onclick="setPreset('h1',this)">H1</button>
+      <button class="f-btn"    data-p="h2"  onclick="setPreset('h2',this)">H2</button>
+    </div>
+  </div>
+  <div class="date-filter-group">
+    <span class="tg-label">Months <span style="font-weight:400;font-size:9px;color:var(--ink-xlight);letter-spacing:0.04em;text-transform:none;font-style:italic;">(click to toggle — multi-select)</span></span>
     <div class="btn-row" id="monthRow">
-      <button class="f-btn on" data-m="all" onclick="setMonth('all',this)">All</button>
-      <button class="f-btn" data-m="01" onclick="setMonth('01',this)">Jan</button>
-      <button class="f-btn" data-m="02" onclick="setMonth('02',this)">Feb</button>
-      <button class="f-btn" data-m="03" onclick="setMonth('03',this)">Mar</button>
-      <button class="f-btn" data-m="04" onclick="setMonth('04',this)">Apr</button>
-      <button class="f-btn" data-m="05" onclick="setMonth('05',this)">May</button>
-      <button class="f-btn" data-m="06" onclick="setMonth('06',this)">Jun</button>
-      <button class="f-btn" data-m="07" onclick="setMonth('07',this)">Jul</button>
-      <button class="f-btn" data-m="08" onclick="setMonth('08',this)">Aug</button>
-      <button class="f-btn" data-m="09" onclick="setMonth('09',this)">Sep</button>
-      <button class="f-btn" data-m="10" onclick="setMonth('10',this)">Oct</button>
-      <button class="f-btn" data-m="11" onclick="setMonth('11',this)">Nov</button>
-      <button class="f-btn" data-m="12" onclick="setMonth('12',this)">Dec</button>
+      <button class="f-btn" data-m="01" onclick="toggleMonth('01',this)">Jan</button>
+      <button class="f-btn" data-m="02" onclick="toggleMonth('02',this)">Feb</button>
+      <button class="f-btn" data-m="03" onclick="toggleMonth('03',this)">Mar</button>
+      <button class="f-btn" data-m="04" onclick="toggleMonth('04',this)">Apr</button>
+      <button class="f-btn" data-m="05" onclick="toggleMonth('05',this)">May</button>
+      <button class="f-btn" data-m="06" onclick="toggleMonth('06',this)">Jun</button>
+      <button class="f-btn" data-m="07" onclick="toggleMonth('07',this)">Jul</button>
+      <button class="f-btn" data-m="08" onclick="toggleMonth('08',this)">Aug</button>
+      <button class="f-btn" data-m="09" onclick="toggleMonth('09',this)">Sep</button>
+      <button class="f-btn" data-m="10" onclick="toggleMonth('10',this)">Oct</button>
+      <button class="f-btn" data-m="11" onclick="toggleMonth('11',this)">Nov</button>
+      <button class="f-btn" data-m="12" onclick="toggleMonth('12',this)">Dec</button>
     </div>
   </div>
   <button class="btn-ghost small" onclick="clearDateFilters()">Clear</button>
@@ -206,133 +218,24 @@
 var ALL_PROJECTS     = {{ projects | safe }};
 var DESIGNER_SUMMARY = {{ designer_summary | safe }};
 var tState = {des:'All', margin:'all', rev:'all', search:'', sort:'profit', dir:-1, filtered:null};
-var dState = {year:'all', month:'all'};
-var chart = null;
-var currentChartMode = 'profit';
+// ═══════════════════════════════════════════════════════
+// DATE FILTER STATE + KPI RENDERING (clean rewrite)
+// ═══════════════════════════════════════════════════════
 
-function fmt(n) {
-  if (!n || n === 0) return '—';
-  if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
-  if (Math.abs(n) >= 1e3) return '$' + Math.round(n/1e3) + 'K';
-  return '$' + Math.round(n);
-}
+// dState.months is ALWAYS an array. Empty = all months.
+var dState = { year: 'all', months: [] };
 
-function kpi(label, value, sub, accent, sparkline, delta) {
-  var sparkHtml = sparkline || '';
-  var deltaHtml = delta || '';
-  return '<div class="kpi-card">' +
-    '<p class="kpi-label">' + label + '</p>' +
-    '<p class="kpi-value' + (accent ? ' accent' : '') + '">' + value + '</p>' +
-    '<p class="kpi-period">' + sub + '</p>' +
-    sparkHtml +
-    deltaHtml +
-  '</div>';
-}
-
-// Build SVG sparkline from an array of 12 monthly values
-function sparkline(values, color) {
-  if (!values || !values.length) return '';
-  var max = Math.max.apply(null, values);
-  var min = Math.min.apply(null, values);
-  var range = max - min || 1;
-  var w = 240, h = 32, pad = 2;
-  var stepX = (w - pad*2) / (values.length - 1);
-  var points = values.map(function(v, i) {
-    var x = pad + i * stepX;
-    var y = h - pad - ((v - min) / range) * (h - pad*2);
-    return x.toFixed(1) + ',' + y.toFixed(1);
-  }).join(' ');
-  // Area fill path
-  var firstX = pad;
-  var lastX  = pad + (values.length - 1) * stepX;
-  var areaPath = 'M ' + firstX + ',' + h + ' L ' + points.replace(/ /g, ' L ') + ' L ' + lastX + ',' + h + ' Z';
-  return '<svg class="kpi-sparkline" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="' + areaPath + '" fill="' + color + '" opacity="0.08"/>' +
-    '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' +
-  '</svg>';
-}
-
-// Get 12 monthly values for the currently filtered year and metric
-function getMonthlyValues(year, metric) {
-  var vals = new Array(12).fill(0);
-  ALL_PROJECTS.forEach(function(p) {
-    var md = p.monthly_data || {};
-    Object.keys(md).forEach(function(k) {
-      var parts = k.split('-');
-      if (year !== 'all' && parts[0] !== year) return;
-      var m = parseInt(parts[1]) - 1;
-      if (m < 0 || m > 11) return;
-      if (metric === 'revenue')      vals[m] += md[k].revenue || 0;
-      else if (metric === 'profit')  vals[m] += md[k].profit || 0;
-      else if (metric === 'time_billing') vals[m] += md[k].time_billing || 0;
-      else if (metric === 'margin') {
-        // margin is special - compute after revenue/profit sums
-      }
-    });
-  });
-  if (metric === 'margin') {
-    // Recompute: margin per month = profit / revenue
-    var rev = new Array(12).fill(0), prof = new Array(12).fill(0);
-    ALL_PROJECTS.forEach(function(p) {
-      var md = p.monthly_data || {};
-      Object.keys(md).forEach(function(k) {
-        var parts = k.split('-');
-        if (year !== 'all' && parts[0] !== year) return;
-        var m = parseInt(parts[1]) - 1;
-        rev[m] += md[k].revenue || 0;
-        prof[m] += md[k].profit || 0;
-      });
-    });
-    for (var i = 0; i < 12; i++) vals[i] = rev[i] > 0 ? (prof[i]/rev[i])*100 : 0;
-  }
-  return vals;
-}
-
-// Compute total across all years for a metric (for comparison delta)
-function getTotalForYear(year, metric) {
-  var rev = 0, prof = 0, tb = 0;
-  ALL_PROJECTS.forEach(function(p) {
-    var md = p.monthly_data || {};
-    Object.keys(md).forEach(function(k) {
-      var parts = k.split('-');
-      if (year !== 'all' && parts[0] !== year) return;
-      rev  += md[k].revenue || 0;
-      prof += md[k].profit || 0;
-      tb   += md[k].time_billing || 0;
-    });
-  });
-  if (metric === 'revenue')      return rev;
-  if (metric === 'profit')       return prof;
-  if (metric === 'time_billing') return tb;
-  if (metric === 'margin')       return rev > 0 ? (prof/rev)*100 : 0;
-  return 0;
-}
-
-function deltaIndicator(current, previous, isPercent) {
-  if (!previous) return '';
-  var diff, pct;
-  if (isPercent) {
-    diff = current - previous;
-    var arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '—');
-    var cls = diff > 0 ? 'delta-up' : (diff < 0 ? 'delta-down' : 'delta-neutral');
-    return '<div class="kpi-trend"><span class="kpi-delta ' + cls + '">' + arrow + ' ' + Math.abs(diff).toFixed(1) + 'pts</span><span class="kpi-trend-label">vs prior year</span></div>';
-  } else {
-    pct = ((current - previous) / Math.abs(previous)) * 100;
-    var arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '—');
-    var cls = pct > 0 ? 'delta-up' : (pct < 0 ? 'delta-down' : 'delta-neutral');
-    return '<div class="kpi-trend"><span class="kpi-delta ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(0) + '%</span><span class="kpi-trend-label">vs prior year</span></div>';
-  }
-}
-
-// ── Date filtering ──
+// ── Filter: project data by current dState ──
 function filterByDate(projects) {
-  if (dState.year === 'all' && dState.month === 'all') return projects;
+  var hasYear   = dState.year !== 'all';
+  var hasMonth  = dState.months.length > 0;
+  if (!hasYear && !hasMonth) return projects;
   return projects.map(function(p) {
     var md = p.monthly_data || {};
     var keys = Object.keys(md).filter(function(k) {
       var parts = k.split('-');
-      if (dState.year !== 'all' && parts[0] !== dState.year) return false;
-      if (dState.month !== 'all' && parts[1] !== dState.month) return false;
+      if (hasYear  && parts[0] !== dState.year)               return false;
+      if (hasMonth && dState.months.indexOf(parts[1]) < 0)   return false;
       return true;
     });
     if (!keys.length) return null;
@@ -347,312 +250,178 @@ function filterByDate(projects) {
   }).filter(function(p) { return p !== null; });
 }
 
-// ── Rendering ──
-function renderKPIs(data) {
-  // If period comparison has 2+ periods, show all of them per card
-  if (compareState && compareState.periods && compareState.periods.length >= 2) {
-    renderKPIsCompare();
-    return;
-  }
-  var totalRev    = data.reduce(function(s,p){return s+p.revenue;},0);
-  var totalProfit = data.reduce(function(s,p){return s+p.profit;},0);
-  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100) : 0;
-  var totalTB     = data.reduce(function(s,p){return s+p.time_billing;},0);
-
-  // Determine current year for sparkline + previous year for delta
-  var currentYear = dState.year !== 'all' ? dState.year : (getAvailableYears().slice(-1)[0] || 'all');
-  var priorYear   = null;
-  var years = getAvailableYears();
-  var idx = years.indexOf(currentYear);
-  if (idx > 0) priorYear = years[idx - 1];
-
-  var label = 'All periods';
-  if (dState.year !== 'all' || dState.month !== 'all') {
-    var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    label = (dState.month !== 'all' ? monthNames[parseInt(dState.month)] + ' ' : '') + (dState.year !== 'all' ? dState.year : '');
-  }
-
-  var oliveColor = '#444735';
-
-  // Sparklines for each metric based on currentYear
-  var sparkRev    = sparkline(getMonthlyValues(currentYear, 'revenue'),      oliveColor);
-  var sparkProfit = sparkline(getMonthlyValues(currentYear, 'profit'),       oliveColor);
-  var sparkMargin = sparkline(getMonthlyValues(currentYear, 'margin'),       oliveColor);
-  var sparkTB     = sparkline(getMonthlyValues(currentYear, 'time_billing'), oliveColor);
-
-  // Deltas vs prior year (only when a year is filtered or auto-selected)
-  var deltaRev    = priorYear ? deltaIndicator(totalRev,    getTotalForYear(priorYear, 'revenue'),      false) : '';
-  var deltaProfit = priorYear ? deltaIndicator(totalProfit, getTotalForYear(priorYear, 'profit'),       false) : '';
-  var deltaMargin = priorYear ? deltaIndicator(totalMargin, getTotalForYear(priorYear, 'margin'),       true)  : '';
-  var deltaTB     = priorYear ? deltaIndicator(totalTB,     getTotalForYear(priorYear, 'time_billing'), false) : '';
-
-  document.getElementById('kpiGrid').innerHTML =
-    kpi('Total Revenue',  fmt(totalRev),    label, false, sparkRev,    deltaRev) +
-    kpi('Total Profit',   fmt(totalProfit), label, true,  sparkProfit, deltaProfit) +
-    kpi('Overall Margin', totalMargin.toFixed(1)+'%', label, false, sparkMargin, deltaMargin) +
-    kpi('Time Billing',   fmt(totalTB),     label, false, sparkTB,     deltaTB);
-}
-
-function renderKPIsCompare() {
-  var periodTotals = compareState.periods.map(function(period, idx) {
-    var range = getPeriodRange(period);
-    var rev = 0, prof = 0, tb = 0;
-    ALL_PROJECTS.forEach(function(p) {
-      var md = p.monthly_data || {};
-      Object.keys(md).forEach(function(k) {
-        var parts = k.split('-');
-        if (period.year !== 'all' && parts[0] !== period.year) return;
-        if (!monthInRange(k, range[0], range[1])) return;
-        rev  += md[k].revenue      || 0;
-        prof += md[k].profit       || 0;
-        tb   += md[k].time_billing || 0;
-      });
-    });
-    var margin = rev > 0 ? Math.round(prof/rev*1000)/10 : 0;
-    return {
-      label: periodLabel(period),
-      color: PERIOD_COLORS[idx % PERIOD_COLORS.length],
-      revenue: rev, profit: prof, margin: margin, time_billing: tb
-    };
-  });
-
-  document.getElementById('kpiGrid').innerHTML =
-    kpiMulti('Total Revenue',  periodTotals, 'revenue',      fmt) +
-    kpiMulti('Total Profit',   periodTotals, 'profit',       fmt,  true) +
-    kpiMulti('Overall Margin', periodTotals, 'margin',       function(v){return (v||0).toFixed(1)+'%';}) +
-    kpiMulti('Time Billing',   periodTotals, 'time_billing', fmt);
-}
-
-function kpiMulti(label, periods, metric, fmtFn, accent) {
-  if (!periods.length) return kpi(label, '—', 'No data');
-  // Sort periods so latest year comes first; within same year, latest month first
-  var sorted = periods.slice().sort(function(a, b) {
-    var ay = a._raw.year === 'all' ? '9999' : a._raw.year;
-    var by = b._raw.year === 'all' ? '9999' : b._raw.year;
-    if (ay !== by) return by.localeCompare(ay);
-    var am = a._raw.month === 'all' ? '99' : a._raw.month;
-    var bm = b._raw.month === 'all' ? '99' : b._raw.month;
-    return bm.localeCompare(am);
-  });
-
-  var primary = sorted[0];
-  var others  = sorted.slice(1);
-  var primaryVal = primary[metric] || 0;
-
-  // Main large number
-  var main = '<div class="kpi-primary-row">' +
-    '<span class="kpi-row-dot" style="background:' + primary.color + ';"></span>' +
-    '<div>' +
-      '<div class="kpi-primary-label">' + primary.label + '</div>' +
-      '<div class="kpi-value' + (accent ? ' accent' : '') + '">' + fmtFn(primaryVal) + '</div>' +
-    '</div>' +
-  '</div>';
-
-  // Delta rows for other periods
-  var deltas = others.map(function(p) {
-    var val = p[metric] || 0;
-    var delta, deltaHtml;
-    if (metric === 'margin') {
-      delta = primaryVal - val;
-      var arrow = delta > 0 ? '▲' : (delta < 0 ? '▼' : '—');
-      var cls = delta > 0 ? 'delta-up' : (delta < 0 ? 'delta-down' : '');
-      deltaHtml = '<span class="kpi-delta ' + cls + '">' + arrow + ' ' + Math.abs(delta).toFixed(1) + 'pts</span>';
+// ── Build context label for cards ──
+function filterLabel() {
+  if (dState.year === 'all' && dState.months.length === 0) return 'All periods';
+  var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var parts = [];
+  if (dState.months.length > 0) {
+    var ms = dState.months.slice().sort();
+    if (ms.length <= 3) {
+      parts.push(ms.map(function(m) { return monthNames[parseInt(m)]; }).join(', '));
     } else {
-      if (val === 0) {
-        deltaHtml = '<span class="kpi-delta delta-neutral">—</span>';
-      } else {
-        delta = ((primaryVal - val) / Math.abs(val)) * 100;
-        var arrow = delta > 0 ? '▲' : (delta < 0 ? '▼' : '—');
-        var cls = delta > 0 ? 'delta-up' : (delta < 0 ? 'delta-down' : '');
-        deltaHtml = '<span class="kpi-delta ' + cls + '">' + arrow + ' ' + Math.abs(delta).toFixed(0) + '%</span>';
-      }
+      parts.push(ms.length + ' months');
     }
-    return '<div class="kpi-compare-row">' +
-      '<span class="kpi-row-dot small" style="background:' + p.color + ';"></span>' +
-      '<span class="kpi-row-label">' + p.label + '</span>' +
-      '<span class="kpi-row-val-sm">' + fmtFn(val) + '</span>' +
-      deltaHtml +
-    '</div>';
-  }).join('');
+  }
+  parts.push(dState.year === 'all' ? 'All years' : dState.year);
+  return parts.join(' · ');
+}
 
-  return '<div class="kpi-card compare">' +
-    '<p class="kpi-label">' + label + '</p>' +
-    main +
-    (deltas ? '<div class="kpi-compare-rows">' + deltas + '</div>' : '') +
+// ── Monthly series for sparkline (within current filter scope) ──
+function kpiMonthlySeries() {
+  var hasMonth = dState.months.length > 0;
+  var monthlyMap = {};
+  ALL_PROJECTS.forEach(function(p) {
+    var md = p.monthly_data || {};
+    Object.keys(md).forEach(function(k) {
+      var parts = k.split('-');
+      if (dState.year !== 'all' && parts[0] !== dState.year)     return;
+      if (hasMonth && dState.months.indexOf(parts[1]) < 0)       return;
+      if (!monthlyMap[k]) monthlyMap[k] = {revenue:0, profit:0, time_billing:0};
+      monthlyMap[k].revenue      += md[k].revenue      || 0;
+      monthlyMap[k].profit       += md[k].profit       || 0;
+      monthlyMap[k].time_billing += md[k].time_billing || 0;
+    });
+  });
+  var keys = Object.keys(monthlyMap).sort();
+  var rev = [], prof = [], tb = [], margin = [];
+  keys.forEach(function(k) {
+    var m = monthlyMap[k];
+    rev.push(m.revenue);
+    prof.push(m.profit);
+    tb.push(m.time_billing);
+    margin.push(m.revenue > 0 ? m.profit/m.revenue*100 : 0);
+  });
+  return {revenue: rev, profit: prof, time_billing: tb, margin: margin};
+}
+
+// ── Year-over-year comparison ──
+function kpiPriorYear() {
+  if (dState.year === 'all') return {};
+  var priorYear = String(parseInt(dState.year) - 1);
+  var hasMonth  = dState.months.length > 0;
+  var cur = {revenue:0, profit:0, time_billing:0};
+  var pri = {revenue:0, profit:0, time_billing:0};
+  ALL_PROJECTS.forEach(function(p) {
+    var md = p.monthly_data || {};
+    Object.keys(md).forEach(function(k) {
+      var parts = k.split('-');
+      var y = parts[0], m = parts[1];
+      if (hasMonth && dState.months.indexOf(m) < 0) return;
+      var bucket = (y === dState.year) ? cur : (y === priorYear ? pri : null);
+      if (!bucket) return;
+      bucket.revenue      += md[k].revenue      || 0;
+      bucket.profit       += md[k].profit       || 0;
+      bucket.time_billing += md[k].time_billing || 0;
+    });
+  });
+  var curMargin = cur.revenue > 0 ? cur.profit/cur.revenue*100 : 0;
+  var priMargin = pri.revenue > 0 ? pri.profit/pri.revenue*100 : 0;
+  function cmp(c, p, isPct) {
+    if (p === 0 && c === 0) return null;
+    if (p === 0) return null;
+    var d = isPct ? (c - p) : ((c - p) / Math.abs(p) * 100);
+    return {pct: d, isPct: isPct, prior: p, priorYear: priorYear};
+  }
+  return {
+    revenue:      cmp(cur.revenue,      pri.revenue),
+    profit:       cmp(cur.profit,       pri.profit),
+    margin:       cmp(curMargin,        priMargin, true),
+    time_billing: cmp(cur.time_billing, pri.time_billing)
+  };
+}
+
+// ── Sparkline SVG ──
+function sparkline(values, color) {
+  if (!values || values.length < 2) return '';
+  var w = 260, h = 44;
+  var max = Math.max.apply(null, values);
+  var min = Math.min.apply(null, values);
+  var range = max - min || 1;
+  var step = w / (values.length - 1);
+  var points = values.map(function(v, i) {
+    var x = i * step;
+    var y = h - ((v - min) / range) * (h - 6) - 3;
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  var areaPoints = '0,' + h + ' ' + points + ' ' + w + ',' + h;
+  var lastIdx = values.length - 1;
+  var lastX = (lastIdx * step).toFixed(1);
+  var lastY = (h - ((values[lastIdx] - min) / range) * (h - 6) - 3).toFixed(1);
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:100%;">' +
+    '<polygon points="' + areaPoints + '" fill="' + color + '" fill-opacity="0.08"/>' +
+    '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + lastX + '" cy="' + lastY + '" r="3" fill="' + color + '"/>' +
+  '</svg>';
+}
+
+// ── Single KPI card renderer ──
+function kpiCard(opts) {
+  // opts: {label, value, context, series, prior, accent, isPercent}
+  var color    = opts.accent ? 'var(--gold-dark)' : 'var(--deep-olive)';
+  var sparkHex = opts.accent ? '#b89653' : '#444735';
+  var spark    = opts.series && opts.series.length >= 2 ? sparkline(opts.series, sparkHex) : '';
+
+  // Trend indicator
+  var trend = '';
+  if (opts.prior && opts.prior.pct !== null && opts.prior.pct !== undefined) {
+    var dir = opts.prior.pct > 0.1 ? 'up' : (opts.prior.pct < -0.1 ? 'down' : 'flat');
+    var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
+    var v = opts.prior.isPct
+      ? Math.abs(opts.prior.pct).toFixed(1) + 'pts'
+      : Math.abs(opts.prior.pct).toFixed(0) + '%';
+    trend = '<div class="kpi-trend ' + dir + '">' +
+      '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + v + '</span>' +
+      '<span class="trend-meta">vs ' + opts.prior.priorYear + '</span>' +
+    '</div>';
+  } else if (opts.series && opts.series.length >= 2) {
+    var first = opts.series[0], last = opts.series[opts.series.length - 1];
+    if (Math.abs(first) > 0.001) {
+      var delta = opts.isPercent ? (last - first) : ((last - first) / Math.abs(first) * 100);
+      var dir = delta > 0.1 ? 'up' : (delta < -0.1 ? 'down' : 'flat');
+      var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
+      var v = opts.isPercent ? Math.abs(delta).toFixed(1) + 'pts' : Math.abs(delta).toFixed(0) + '%';
+      trend = '<div class="kpi-trend ' + dir + '">' +
+        '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + v + '</span>' +
+        '<span class="trend-meta">first → last</span>' +
+      '</div>';
+    }
+  }
+  if (!trend) trend = '<div class="kpi-trend flat"><span class="trend-meta">No comparison data</span></div>';
+
+  return '<div class="kpi-card' + (opts.accent ? ' accent' : '') + '">' +
+    '<p class="kpi-label">' + opts.label + '</p>' +
+    '<p class="kpi-value">' + opts.value + '</p>' +
+    '<p class="kpi-context">' + opts.context + '</p>' +
+    '<div class="kpi-spark">' + spark + '</div>' +
+    trend +
   '</div>';
 }
 
-function renderDesignerBars(data) {
-  var desMap = {};
-  data.forEach(function(p) {
-    if (p.designer === 'Unassigned') return;
-    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0, margin:0};
-    desMap[p.designer].revenue += p.revenue;
-    desMap[p.designer].profit  += p.profit;
-  });
-  Object.values(desMap).forEach(function(d) {
-    d.margin = d.revenue > 0 ? Math.round(d.profit/d.revenue*1000)/10 : 0;
-  });
+// ── Main KPI renderer — one variant, always dynamic ──
+function renderKPIs(data) {
+  var totals = {
+    revenue:      data.reduce(function(s,p){return s+p.revenue;},0),
+    profit:       data.reduce(function(s,p){return s+p.profit;},0),
+    time_billing: data.reduce(function(s,p){return s+p.time_billing;},0)
+  };
+  totals.margin = totals.revenue > 0 ? totals.profit/totals.revenue*100 : 0;
 
-  var byRev = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
-  var maxRev = byRev.length ? byRev[0].revenue : 1;
-  document.getElementById('revBars').innerHTML = byRev.map(function(d) {
-    var pct = (d.revenue/maxRev*100).toFixed(0);
-    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color+';"></div></div>' +
-      '<span class="des-num">'+fmt(d.revenue)+'</span></div>';
-  }).join('');
+  var ctx    = filterLabel();
+  var series = kpiMonthlySeries();
+  var prior  = kpiPriorYear();
 
-  var byMar = Object.values(desMap).sort(function(a,b){return b.margin-a.margin;});
-  var maxMar = byMar.length ? byMar[0].margin : 1;
-  document.getElementById('marginBars').innerHTML = byMar.map(function(d) {
-    var pct = Math.max(0, Math.min(100, (d.margin/maxMar*100))).toFixed(0);
-    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;opacity:.8;background:'+d.color+';"></div></div>' +
-      '<span class="des-pct" style="color:'+d.color+';">'+d.margin+'%</span></div>';
-  }).join('');
+  document.getElementById('kpiGrid').innerHTML =
+    kpiCard({label:'Total Revenue',  value:fmt(totals.revenue),      context:ctx, series:series.revenue,      prior:prior.revenue}) +
+    kpiCard({label:'Total Profit',   value:fmt(totals.profit),       context:ctx, series:series.profit,       prior:prior.profit, accent:true}) +
+    kpiCard({label:'Overall Margin', value:totals.margin.toFixed(1)+'%', context:'Blended rate · '+ctx, series:series.margin, prior:prior.margin, isPercent:true}) +
+    kpiCard({label:'Time Billing',   value:fmt(totals.time_billing), context:ctx, series:series.time_billing, prior:prior.time_billing});
 }
 
-function renderLegend(data) {
-  var desMap = {};
-  data.forEach(function(p) {
-    if (p.designer === 'Unassigned') return;
-    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label, color:p.color_hex};
-  });
-  document.getElementById('chartLegend').innerHTML = Object.values(desMap).map(function(d) {
-    return '<span class="leg-item"><span class="leg-dot" style="background:'+d.color+';"></span>'+d.label+'</span>';
-  }).join('');
-}
+// ═══════════════════════════════════════════════════════
+// FILTER CONTROLS
+// ═══════════════════════════════════════════════════════
 
-function buildChart(mode, data) {
-  if (typeof Chart === 'undefined') { console.warn('Chart.js not loaded'); return; }
-  var desMap = {};
-  data.forEach(function(p) {
-    if (p.designer === 'Unassigned') return;
-    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0, time_billing:0, _rev:0, _prof:0};
-    desMap[p.designer].revenue      += p.revenue;
-    desMap[p.designer].profit       += p.profit;
-    desMap[p.designer].time_billing += p.time_billing;
-    desMap[p.designer]._rev         += p.revenue;
-    desMap[p.designer]._prof        += p.profit;
-  });
-  Object.values(desMap).forEach(function(d) {
-    d.margin = d._rev > 0 ? Math.round(d._prof/d._rev*1000)/10 : 0;
-  });
-  var summary = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
-  if (!summary.length) return;
-
-  if (chart) { chart.destroy(); chart = null; }
-  var wrap = document.getElementById('mainChart').parentNode;
-  wrap.innerHTML = '<canvas id="mainChart"></canvas>';
-  var ctx = document.getElementById('mainChart').getContext('2d');
-  var labels = summary.map(function(d){return d.label;});
-  var vals   = summary.map(function(d){
-    return mode==='profit'?d.profit : mode==='revenue'?d.revenue : mode==='margin'?d.margin : d.time_billing;
-  });
-  var fmtFn = mode==='margin' ? function(v){return v.toFixed(1)+'%';} : function(v){return fmt(v);};
-
-  chart = new Chart(ctx, {
-    type:'bar',
-    data:{
-      labels: labels,
-      datasets:[{
-        data: vals,
-        backgroundColor: summary.map(function(d){return d.color+'cc';}),
-        borderColor:     summary.map(function(d){return d.color;}),
-        borderWidth:1, borderRadius:2, borderSkipped:'bottom'
-      }]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          callbacks:{label:function(c){return ' '+fmtFn(c.raw);}},
-          backgroundColor:'rgba(53,55,56,0.94)', titleColor:'#a8a8a9', bodyColor:'#fcf8f3',
-          padding:12, cornerRadius:2
-        }
-      },
-      scales:{
-        x:{grid:{display:false},border:{display:false},ticks:{color:'#a8a8a9',font:{size:11}}},
-        y:{grid:{color:'rgba(68,71,53,0.06)'},border:{display:false},
-           ticks:{color:'#a8a8a9',font:{size:11},callback:function(v){return fmtFn(v);}}}
-      }
-    }
-  });
-  currentChartMode = mode;
-}
-
-function switchChart(mode, btn) {
-  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
-  btn.classList.add('active');
-  var data = tState.filtered || ALL_PROJECTS;
-  buildChart(mode, data);
-}
-
-// ── Table ──
-function buildDesFilterBtns(data) {
-  var row = document.getElementById('desFiltRow');
-  row.innerHTML = '<button class="f-btn on" onclick="setDesFilter(\'All\',this)">All</button>';
-  var seen = {};
-  data.forEach(function(p) {
-    if (p.designer === 'Unassigned' || seen[p.designer]) return;
-    seen[p.designer] = true;
-    var btn = document.createElement('button');
-    btn.className = 'f-btn';
-    btn.textContent = p.designer_label;
-    btn.onclick = (function(des) { return function() { setDesFilter(des, this); }; })(p.designer);
-    row.appendChild(btn);
-  });
-}
-
-function renderTable() {
-  var source = tState.filtered || ALL_PROJECTS;
-  var rows = source.filter(function(p) {
-    if (tState.des !== 'All' && p.designer !== tState.des) return false;
-    if (tState.margin === 'high' && p.margin <= 50)  return false;
-    if (tState.margin === 'mid'  && (p.margin < 30 || p.margin > 50)) return false;
-    if (tState.margin === 'low'  && p.margin >= 30)  return false;
-    if (tState.rev === 'large' && p.revenue <= 500000) return false;
-    if (tState.rev === 'mid'   && (p.revenue < 100000 || p.revenue > 500000)) return false;
-    if (tState.rev === 'small' && p.revenue >= 100000) return false;
-    if (tState.search && p.client.toLowerCase().indexOf(tState.search) < 0) return false;
-    return true;
-  });
-  rows.sort(function(a,b) {
-    var av = tState.sort === 'client' ? a.client : (a[tState.sort] || 0);
-    var bv = tState.sort === 'client' ? b.client : (b[tState.sort] || 0);
-    return typeof av === 'string' ? tState.dir*av.localeCompare(bv) : tState.dir*(av-bv);
-  });
-  document.getElementById('resultCount').textContent =
-    'Showing ' + rows.length + ' of ' + source.length + ' projects';
-  var body = document.getElementById('tableBody');
-  if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="6" class="tbl-empty">No projects match the current filters.</td></tr>';
-    return;
-  }
-  try {
-    body.innerHTML = rows.map(function(p) {
-      var margin = parseFloat(p.margin) || 0;
-      var bw = Math.max(0, Math.min(100, margin));
-      var color = p.color_hex || '#888888';
-      return '<tr>' +
-        '<td><a href="/clients/' + (p.client_id||'') + '" class="c-link"><div class="c-name">' + (p.client||'') + '</div></a></td>' +
-        '<td><span class="des-pill" style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '44;">' + (p.designer_label||'—') + '</span></td>' +
-        '<td class="r">' + fmt(p.revenue) + '</td>' +
-        '<td class="r' + (p.profit<0?' neg':'') + '">' + fmt(p.profit) + '</td>' +
-        '<td class="r">' + (p.time_billing>0?fmt(p.time_billing):'—') + '</td>' +
-        '<td class="r"><div class="bar-cell">' +
-          '<div class="mini-bar"><div class="mini-fill" style="width:'+bw+'%;background:'+color+';"></div></div>' +
-          '<span class="pct-num'+(margin<0?' neg':'')+'" style="color:'+(margin>60?color:'')+'">' + margin.toFixed(1) + '%</span>' +
-        '</div></td></tr>';
-    }).join('');
-  } catch(e) {
-    body.innerHTML = '<tr><td colspan="6" class="tbl-empty">Error: ' + e.message + '</td></tr>';
-  }
-}
-
-// ── Date filter controls ──
 function buildYearBtns() {
   var years = {};
   ALL_PROJECTS.forEach(function(p) {
@@ -671,23 +440,64 @@ function buildYearBtns() {
 
 function setYear(val, btn) {
   dState.year = val;
-  document.querySelectorAll('#yearRow .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
-  btn.classList.add('on'); btn.style.background='#444735'; btn.style.borderColor='#444735'; btn.style.color='#fcf8f3';
+  document.querySelectorAll('#yearRow .f-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
   refreshAll();
 }
 
-function setMonth(val, btn) {
-  dState.month = val;
-  document.querySelectorAll('#monthRow .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
-  btn.classList.add('on'); btn.style.background='#444735'; btn.style.borderColor='#444735'; btn.style.color='#fcf8f3';
+// ── Presets (All, YTD, Q1-4, H1-2) ──
+function setPreset(name, btn) {
+  if (name === 'all') {
+    dState.months = [];
+  } else if (name === 'ytd') {
+    var cur = (new Date()).getMonth() + 1;
+    var out = [];
+    for (var i = 1; i <= cur; i++) out.push(i < 10 ? '0'+i : ''+i);
+    dState.months = out;
+  } else if (name === 'q1') dState.months = ['01','02','03'];
+  else if (name === 'q2')   dState.months = ['04','05','06'];
+  else if (name === 'q3')   dState.months = ['07','08','09'];
+  else if (name === 'q4')   dState.months = ['10','11','12'];
+  else if (name === 'h1')   dState.months = ['01','02','03','04','05','06'];
+  else if (name === 'h2')   dState.months = ['07','08','09','10','11','12'];
+  // Highlight active preset
+  document.querySelectorAll('#presetRow .f-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+  syncMonthButtons();
   refreshAll();
+}
+
+// ── Multi-select individual months ──
+function toggleMonth(m, btn) {
+  var idx = dState.months.indexOf(m);
+  if (idx >= 0) dState.months.splice(idx, 1);
+  else          dState.months.push(m);
+  // Deactivate preset buttons (user went manual)
+  document.querySelectorAll('#presetRow .f-btn').forEach(function(b){ b.classList.remove('on'); });
+  // If no months selected, highlight "All" preset
+  if (dState.months.length === 0) {
+    var allBtn = document.querySelector('#presetRow .f-btn[data-p="all"]');
+    if (allBtn) allBtn.classList.add('on');
+  }
+  syncMonthButtons();
+  refreshAll();
+}
+
+function syncMonthButtons() {
+  document.querySelectorAll('#monthRow .f-btn').forEach(function(b) {
+    var m = b.getAttribute('data-m');
+    if (dState.months.indexOf(m) >= 0) b.classList.add('on');
+    else                                b.classList.remove('on');
+  });
 }
 
 function clearDateFilters() {
-  dState = {year:'all', month:'all'};
-  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
-  var firstY = document.querySelector('#yearRow .f-btn');  if (firstY) firstY.classList.add('on');
-  var firstM = document.querySelector('#monthRow .f-btn'); if (firstM) firstM.classList.add('on');
+  dState = {year:'all', months:[]};
+  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn, #presetRow .f-btn').forEach(function(b){
+    b.classList.remove('on');
+  });
+  var ally = document.querySelector('#yearRow .f-btn[data-y="all"]'); if (ally) ally.classList.add('on');
+  var allp = document.querySelector('#presetRow .f-btn[data-p="all"]'); if (allp) allp.classList.add('on');
   refreshAll();
 }
 
@@ -700,15 +510,19 @@ function refreshAll() {
   buildChart(currentChartMode, filtered);
   renderTable();
   buildDesFilterBtns(filtered);
+  // Also refresh the compare chart if there are configured periods
+  if (compareState && compareState.periods && compareState.periods.length > 0) {
+    renderCompareChart();
+  }
 }
 
 // ── Table filter controls ──
 function activateBtn(btn, rowId, color) {
-  document.querySelectorAll(rowId + ' .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
-  btn.classList.add('on'); btn.style.background=color; btn.style.borderColor=color; btn.style.color='white';
+  document.querySelectorAll(rowId + ' .f-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
 }
-function setDesFilter(val, btn) { tState.des=val; activateBtn(btn,'#desFiltRow','#444735'); renderTable(); }
-function setFilt(type, val, btn, rowId) { tState[type]=val; activateBtn(btn,rowId,'#444735'); renderTable(); }
+function setDesFilter(val, btn) { tState.des=val; activateBtn(btn,'#desFiltRow'); renderTable(); }
+function setFilt(type, val, btn, rowId) { tState[type]=val; activateBtn(btn,rowId); renderTable(); }
 function doSearch(v) { tState.search=v.toLowerCase(); renderTable(); }
 function setSort(key, btn) {
   tState.dir = tState.sort===key ? tState.dir*-1 : (key==='client'?1:-1);
@@ -888,7 +702,6 @@ function updateComparePeriod(sel) {
     renderComparePeriods();
   }
   renderCompareChart();
-  renderKPIs(tState.filtered || ALL_PROJECTS);
 }
 
 function addComparePeriod() {
@@ -905,14 +718,12 @@ function addComparePeriod() {
   });
   renderComparePeriods();
   renderCompareChart();
-  renderKPIs(tState.filtered || ALL_PROJECTS);
 }
 
 function removeComparePeriod(idx) {
   compareState.periods.splice(idx, 1);
   renderComparePeriods();
   renderCompareChart();
-  renderKPIs(tState.filtered || ALL_PROJECTS);
 }
 
 function setCompareChartType(type, btn) {
