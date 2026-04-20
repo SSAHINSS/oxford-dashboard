@@ -3,192 +3,7 @@
 {% set active_page = "dashboard" %}
 
 {% block head %}
-<script src="/static/js/chart.umd.js">
-// ── DATE FILTERING ──────────────────────────────────────────────
-var dState = { year: 'all', month: 'all', compare: null };
-
-function getMonthlyProjects(year, month) {
-  // Returns a projected version of ALL_PROJECTS filtered/aggregated by date
-  if (year === 'all' && month === 'all') return ALL_PROJECTS;
-
-  return ALL_PROJECTS.map(function(p) {
-    var md = p.monthly_data || {};
-    if (!Object.keys(md).length) {
-      // No monthly data — include if no date filter, exclude otherwise
-      return null;
-    }
-    var keys = Object.keys(md).filter(function(k) {
-      var parts = k.split('-');
-      var ky = parts[0]; var km = parts[1];
-      if (year !== 'all' && ky !== year) return false;
-      if (month !== 'all' && km !== month) return false;
-      return true;
-    });
-    if (!keys.length) return null;
-    var rev = 0, prof = 0, tb = 0;
-    keys.forEach(function(k) {
-      rev  += md[k].revenue      || 0;
-      prof += md[k].profit       || 0;
-      tb   += md[k].time_billing || 0;
-    });
-    var margin = rev > 0 ? Math.round(prof / rev * 1000) / 10 : 0;
-    return Object.assign({}, p, { revenue: rev, profit: prof, time_billing: tb, margin: margin });
-  }).filter(Boolean);
-}
-
-function buildYearBtns() {
-  var years = new Set();
-  ALL_PROJECTS.forEach(function(p) {
-    Object.keys(p.monthly_data || {}).forEach(function(k) { years.add(k.split('-')[0]); });
-  });
-  if (!years.size) return;
-  var row = document.getElementById('yearRow');
-  var html = '<button class="f-btn on" onclick="setYear('all',this)">All</button>';
-  Array.from(years).sort().forEach(function(y) {
-    html += '<button class="f-btn" onclick="setYear('' + y + '',this)">' + y + '</button>';
-  });
-  row.innerHTML = html;
-  document.getElementById('dateFilterBar').style.display = 'flex';
-}
-
-function setYear(val, btn) {
-  dState.year = val; dState.compare = null;
-  activateBtn(btn, '#yearRow', '#1c1a16');
-  refreshAll();
-}
-function setMonth(val, btn) {
-  dState.month = val; dState.compare = null;
-  activateBtn(btn, '#monthRow', '#1c1a16');
-  refreshAll();
-}
-function setCompare(mode, btn) {
-  dState.compare = mode; dState.month = 'all';
-  activateBtn(btn, '#compareRow', '#1c1a16');
-  if (mode === 'ly_cy') renderLyCy();
-  else if (mode === 'ytd') { dState.year = 'all'; refreshAll(); }
-}
-function clearDateFilters() {
-  dState = { year: 'all', month: 'all', compare: null };
-  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn').forEach(function(b) {
-    b.classList.remove('on'); b.style.cssText = '';
-  });
-  document.querySelector('#yearRow .f-btn').classList.add('on');
-  document.querySelector('#monthRow .f-btn').classList.add('on');
-  refreshAll();
-}
-
-function refreshAll() {
-  var filtered = getMonthlyProjects(dState.year, dState.month);
-  renderKPIsFromData(filtered);
-  renderDesignerBarsFromData(filtered);
-  renderLegend();
-  buildChartFromData('profit', filtered);
-  tState.filtered = filtered;
-  renderTable();
-}
-
-// Extend renderKPIs to accept data param
-function renderKPIsFromData(data) {
-  var totalRev    = data.reduce(function(s,p){return s+p.revenue;},0);
-  var totalProfit = data.reduce(function(s,p){return s+p.profit;},0);
-  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100).toFixed(1) : 0;
-  var totalTB     = data.reduce(function(s,p){return s+p.time_billing;},0);
-  var label = dState.year !== 'all' ? dState.year + (dState.month !== 'all' ? '-' + dState.month : '') : 'All periods';
-  document.getElementById('kpiGrid').innerHTML =
-    kpi('Total Revenue',  fmt(totalRev),    label) +
-    kpi('Total Profit',   fmt(totalProfit), label, true) +
-    kpi('Overall Margin', totalMargin + '%','Blended profit rate') +
-    kpi('Time Billing',   fmt(totalTB),     label);
-}
-
-function renderDesignerBarsFromData(data) {
-  var desMap = {};
-  data.forEach(function(p) {
-    if (p.designer === 'Unassigned') return;
-    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label,color:p.color_hex,revenue:0,profit:0,margin:0};
-    desMap[p.designer].revenue += p.revenue;
-    desMap[p.designer].profit  += p.profit;
-  });
-  Object.values(desMap).forEach(function(d) {
-    d.margin = d.revenue > 0 ? Math.round(d.profit/d.revenue*1000)/10 : 0;
-  });
-  var byRev = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
-  var maxRev = byRev.length ? byRev[0].revenue : 1;
-  document.getElementById('revBars').innerHTML = byRev.map(function(d) {
-    var pct = (d.revenue/maxRev*100).toFixed(0);
-    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color+';"></div></div>' +
-      '<span class="des-num">'+fmt(d.revenue)+'</span></div>';
-  }).join('');
-  var byMar = Object.values(desMap).sort(function(a,b){return b.margin-a.margin;});
-  var maxMar = byMar.length ? byMar[0].margin : 1;
-  document.getElementById('marginBars').innerHTML = byMar.map(function(d) {
-    var pct = (d.margin/maxMar*100).toFixed(0);
-    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;opacity:.8;background:'+d.color+';"></div></div>' +
-      '<span class="des-pct" style="color:'+d.color+';">'+d.margin+'%</span></div>';
-  }).join('');
-}
-
-function buildChartFromData(mode, data) {
-  var desMap = {};
-  data.forEach(function(p) {
-    if (p.designer === 'Unassigned') return;
-    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label,color:p.color_hex,revenue:0,profit:0,time_billing:0,margin:0,_rev:0,_prof:0};
-    desMap[p.designer].revenue       += p.revenue;
-    desMap[p.designer].profit        += p.profit;
-    desMap[p.designer].time_billing  += p.time_billing;
-    desMap[p.designer]._rev          += p.revenue;
-    desMap[p.designer]._prof         += p.profit;
-  });
-  Object.values(desMap).forEach(function(d) {
-    d.margin = d._rev > 0 ? Math.round(d._prof/d._rev*1000)/10 : 0;
-  });
-  var summary = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
-  if (!summary.length) return;
-
-  if (chart) { chart.destroy(); chart = null; }
-  var wrap = document.getElementById('mainChart').parentNode;
-  wrap.innerHTML = '<canvas id="mainChart"></canvas>';
-  var ctx = document.getElementById('mainChart').getContext('2d');
-  var labels = summary.map(function(d){return d.label;});
-  var vals   = summary.map(function(d){
-    return mode==='profit'?d.profit:mode==='revenue'?d.revenue:mode==='margin'?d.margin:d.time_billing;
-  });
-  var fmtFn = mode==='margin'?function(v){return v.toFixed(1)+'%';}:function(v){return fmt(v);};
-  chart = new Chart(ctx, {
-    type:'bar',
-    data:{ labels:labels, datasets:[{
-      data:vals,
-      backgroundColor:summary.map(function(d){return d.color+'cc';}),
-      borderColor:summary.map(function(d){return d.color;}),
-      borderWidth:1,borderRadius:2,borderSkipped:'bottom'
-    }]},
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+fmtFn(c.raw);}},
-        backgroundColor:'rgba(28,26,22,0.92)',titleColor:'#a09890',bodyColor:'#f7f4ee',padding:12,cornerRadius:2}},
-      scales:{
-        x:{grid:{display:false},border:{display:false},ticks:{color:'#a09890',font:{size:11}}},
-        y:{grid:{color:'rgba(28,26,22,0.04)'},border:{display:false},ticks:{color:'#a09890',font:{size:11},callback:function(v){return fmtFn(v);}}}
-      }
-    }
-  });
-  currentChartMode = mode;
-  currentChartData = data;
-}
-
-var currentChartMode = 'profit';
-var currentChartData = null;
-
-function switchChart(mode, btn) {
-  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
-  btn.classList.add('active');
-  currentChartMode = mode;
-  buildChartFromData(mode, currentChartData || ALL_PROJECTS);
-}
-
-</script>
+<script src="/static/js/chart.umd.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -221,26 +36,19 @@ function switchChart(mode, btn) {
   <div class="date-filter-group">
     <span class="tg-label">Month</span>
     <div class="btn-row" id="monthRow">
-      <button class="f-btn on" onclick="setMonth('all',this)">All</button>
-      <button class="f-btn" onclick="setMonth('01',this)">Jan</button>
-      <button class="f-btn" onclick="setMonth('02',this)">Feb</button>
-      <button class="f-btn" onclick="setMonth('03',this)">Mar</button>
-      <button class="f-btn" onclick="setMonth('04',this)">Apr</button>
-      <button class="f-btn" onclick="setMonth('05',this)">May</button>
-      <button class="f-btn" onclick="setMonth('06',this)">Jun</button>
-      <button class="f-btn" onclick="setMonth('07',this)">Jul</button>
-      <button class="f-btn" onclick="setMonth('08',this)">Aug</button>
-      <button class="f-btn" onclick="setMonth('09',this)">Sep</button>
-      <button class="f-btn" onclick="setMonth('10',this)">Oct</button>
-      <button class="f-btn" onclick="setMonth('11',this)">Nov</button>
-      <button class="f-btn" onclick="setMonth('12',this)">Dec</button>
-    </div>
-  </div>
-  <div class="date-filter-group">
-    <span class="tg-label">Compare</span>
-    <div class="btn-row">
-      <button class="f-btn" onclick="setCompare('ly_cy',this)">LY vs CY</button>
-      <button class="f-btn" onclick="setCompare('ytd',this)">YTD</button>
+      <button class="f-btn on" data-m="all" onclick="setMonth('all',this)">All</button>
+      <button class="f-btn" data-m="01" onclick="setMonth('01',this)">Jan</button>
+      <button class="f-btn" data-m="02" onclick="setMonth('02',this)">Feb</button>
+      <button class="f-btn" data-m="03" onclick="setMonth('03',this)">Mar</button>
+      <button class="f-btn" data-m="04" onclick="setMonth('04',this)">Apr</button>
+      <button class="f-btn" data-m="05" onclick="setMonth('05',this)">May</button>
+      <button class="f-btn" data-m="06" onclick="setMonth('06',this)">Jun</button>
+      <button class="f-btn" data-m="07" onclick="setMonth('07',this)">Jul</button>
+      <button class="f-btn" data-m="08" onclick="setMonth('08',this)">Aug</button>
+      <button class="f-btn" data-m="09" onclick="setMonth('09',this)">Sep</button>
+      <button class="f-btn" data-m="10" onclick="setMonth('10',this)">Oct</button>
+      <button class="f-btn" data-m="11" onclick="setMonth('11',this)">Nov</button>
+      <button class="f-btn" data-m="12" onclick="setMonth('12',this)">Dec</button>
     </div>
   </div>
   <button class="btn-ghost small" onclick="clearDateFilters()">Clear</button>
@@ -256,10 +64,8 @@ function switchChart(mode, btn) {
 </div>
 {% else %}
 
-<!-- KPIs -->
 <div class="kpi-grid" id="kpiGrid"></div>
 
-<!-- Designer panels -->
 <section>
   <div class="section-header"><span class="section-label">Designer Performance</span><div class="section-line"></div></div>
   <div class="designer-grid">
@@ -274,7 +80,6 @@ function switchChart(mode, btn) {
   </div>
 </section>
 
-<!-- Chart -->
 <section>
   <div class="section-header"><span class="section-label">Comparative View</span><div class="section-line"></div></div>
   <div class="chart-wrap">
@@ -291,7 +96,6 @@ function switchChart(mode, btn) {
   </div>
 </section>
 
-<!-- Table -->
 <section class="table-section">
   <div class="section-header"><span class="section-label">Project Breakdown</span><div class="section-line"></div></div>
   <div class="toolbar">
@@ -305,18 +109,18 @@ function switchChart(mode, btn) {
       <span class="tg-label">Margin</span>
       <div class="btn-row" id="margRow">
         <button class="f-btn on" onclick="setFilt('margin','all',this,'#margRow')">All</button>
-        <button class="f-btn"    onclick="setFilt('margin','high',this,'#margRow')">&gt;50%</button>
-        <button class="f-btn"    onclick="setFilt('margin','mid',this,'#margRow')">30–50%</button>
-        <button class="f-btn"    onclick="setFilt('margin','low',this,'#margRow')">&lt;30%</button>
+        <button class="f-btn" onclick="setFilt('margin','high',this,'#margRow')">&gt;50%</button>
+        <button class="f-btn" onclick="setFilt('margin','mid',this,'#margRow')">30–50%</button>
+        <button class="f-btn" onclick="setFilt('margin','low',this,'#margRow')">&lt;30%</button>
       </div>
     </div>
     <div class="tool-group">
       <span class="tg-label">Revenue</span>
       <div class="btn-row" id="revRow">
         <button class="f-btn on" onclick="setFilt('rev','all',this,'#revRow')">All</button>
-        <button class="f-btn"    onclick="setFilt('rev','large',this,'#revRow')">&gt;$500K</button>
-        <button class="f-btn"    onclick="setFilt('rev','mid',this,'#revRow')">$100K–500K</button>
-        <button class="f-btn"    onclick="setFilt('rev','small',this,'#revRow')">&lt;$100K</button>
+        <button class="f-btn" onclick="setFilt('rev','large',this,'#revRow')">&gt;$500K</button>
+        <button class="f-btn" onclick="setFilt('rev','mid',this,'#revRow')">$100K–500K</button>
+        <button class="f-btn" onclick="setFilt('rev','small',this,'#revRow')">&lt;$100K</button>
       </div>
     </div>
     <div class="tool-group">
@@ -353,94 +157,145 @@ function switchChart(mode, btn) {
 
 {% block scripts %}
 <script>
-var ALL_PROJECTS      = {{ projects | safe }};
-var DESIGNER_SUMMARY  = {{ designer_summary | safe }};
-var tState = {des:'All', margin:'all', rev:'all', search:'', sort:'profit', dir:-1};
+var ALL_PROJECTS     = {{ projects | safe }};
+var DESIGNER_SUMMARY = {{ designer_summary | safe }};
+var tState = {des:'All', margin:'all', rev:'all', search:'', sort:'profit', dir:-1, filtered:null};
+var dState = {year:'all', month:'all'};
+var chart = null;
+var currentChartMode = 'profit';
 
 function fmt(n) {
   if (!n || n === 0) return '—';
-  if (n >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return '$' + Math.round(n/1e3) + 'K';
+  if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  if (Math.abs(n) >= 1e3) return '$' + Math.round(n/1e3) + 'K';
   return '$' + Math.round(n);
 }
 
-if (ALL_PROJECTS.length) {
-  tState.filtered = ALL_PROJECTS;
-  renderKPIsFromData(ALL_PROJECTS);
-  renderDesignerBarsFromData(ALL_PROJECTS);
-  renderLegend();
-  buildChartFromData('profit', ALL_PROJECTS);
-  currentChartData = ALL_PROJECTS;
-  renderTable();
-  buildDesFilterBtns();
-  buildYearBtns();
-}
-
-function renderKPIs() {
-  var totalRev    = ALL_PROJECTS.reduce(function(s,p){return s+p.revenue;},0);
-  var totalProfit = ALL_PROJECTS.reduce(function(s,p){return s+p.profit;},0);
-  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100).toFixed(1) : 0;
-  var totalTB     = ALL_PROJECTS.reduce(function(s,p){return s+p.time_billing;},0);
-  document.getElementById('kpiGrid').innerHTML =
-    kpi('Total Revenue',  fmt(totalRev),    'All designers combined') +
-    kpi('Total Profit',   fmt(totalProfit), 'Selling + other profit', true) +
-    kpi('Overall Margin', totalMargin + '%','Blended profit rate') +
-    kpi('Time Billing',   fmt(totalTB),     'Across all designers');
-}
 function kpi(label, value, sub, accent) {
   return '<div class="kpi-card"><p class="kpi-label">'+label+'</p>' +
     '<p class="kpi-value'+(accent?' accent':'')+'">'+value+'</p>' +
     '<p class="kpi-sub">'+sub+'</p></div>';
 }
 
-function renderDesignerBars() {
-  var byRev = DESIGNER_SUMMARY.slice().sort(function(a,b){return b.revenue-a.revenue;});
+// ── Date filtering ──
+function filterByDate(projects) {
+  if (dState.year === 'all' && dState.month === 'all') return projects;
+  return projects.map(function(p) {
+    var md = p.monthly_data || {};
+    var keys = Object.keys(md).filter(function(k) {
+      var parts = k.split('-');
+      if (dState.year !== 'all' && parts[0] !== dState.year) return false;
+      if (dState.month !== 'all' && parts[1] !== dState.month) return false;
+      return true;
+    });
+    if (!keys.length) return null;
+    var rev = 0, prof = 0, tb = 0;
+    keys.forEach(function(k) {
+      rev  += (md[k].revenue)      || 0;
+      prof += (md[k].profit)       || 0;
+      tb   += (md[k].time_billing) || 0;
+    });
+    var margin = rev > 0 ? Math.round(prof/rev*1000)/10 : 0;
+    return Object.assign({}, p, {revenue:rev, profit:prof, time_billing:tb, margin:margin});
+  }).filter(function(p) { return p !== null; });
+}
+
+// ── Rendering ──
+function renderKPIs(data) {
+  var totalRev    = data.reduce(function(s,p){return s+p.revenue;},0);
+  var totalProfit = data.reduce(function(s,p){return s+p.profit;},0);
+  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100).toFixed(1) : '0.0';
+  var totalTB     = data.reduce(function(s,p){return s+p.time_billing;},0);
+  var label = 'All periods';
+  if (dState.year !== 'all' || dState.month !== 'all') {
+    var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    label = (dState.month !== 'all' ? monthNames[parseInt(dState.month)] + ' ' : '') + (dState.year !== 'all' ? dState.year : '');
+  }
+  document.getElementById('kpiGrid').innerHTML =
+    kpi('Total Revenue',  fmt(totalRev),    label) +
+    kpi('Total Profit',   fmt(totalProfit), label, true) +
+    kpi('Overall Margin', totalMargin+'%',  'Blended profit rate') +
+    kpi('Time Billing',   fmt(totalTB),     label);
+}
+
+function renderDesignerBars(data) {
+  var desMap = {};
+  data.forEach(function(p) {
+    if (p.designer === 'Unassigned') return;
+    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0, margin:0};
+    desMap[p.designer].revenue += p.revenue;
+    desMap[p.designer].profit  += p.profit;
+  });
+  Object.values(desMap).forEach(function(d) {
+    d.margin = d.revenue > 0 ? Math.round(d.profit/d.revenue*1000)/10 : 0;
+  });
+
+  var byRev = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
   var maxRev = byRev.length ? byRev[0].revenue : 1;
   document.getElementById('revBars').innerHTML = byRev.map(function(d) {
     var pct = (d.revenue/maxRev*100).toFixed(0);
     return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color_hex+';"></div></div>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color+';"></div></div>' +
       '<span class="des-num">'+fmt(d.revenue)+'</span></div>';
   }).join('');
 
-  var byMar = DESIGNER_SUMMARY.slice().sort(function(a,b){return b.margin-a.margin;});
+  var byMar = Object.values(desMap).sort(function(a,b){return b.margin-a.margin;});
   var maxMar = byMar.length ? byMar[0].margin : 1;
   document.getElementById('marginBars').innerHTML = byMar.map(function(d) {
-    var pct = (d.margin/maxMar*100).toFixed(0);
+    var pct = Math.max(0, Math.min(100, (d.margin/maxMar*100))).toFixed(0);
     return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color_hex+';opacity:.8;"></div></div>' +
-      '<span class="des-pct" style="color:'+d.color_hex+';">'+d.margin+'%</span></div>';
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;opacity:.8;background:'+d.color+';"></div></div>' +
+      '<span class="des-pct" style="color:'+d.color+';">'+d.margin+'%</span></div>';
   }).join('');
 }
 
-function renderLegend() {
-  document.getElementById('chartLegend').innerHTML = DESIGNER_SUMMARY.map(function(d) {
-    return '<span class="leg-item"><span class="leg-dot" style="background:'+d.color_hex+';"></span>'+d.label+'</span>';
+function renderLegend(data) {
+  var desMap = {};
+  data.forEach(function(p) {
+    if (p.designer === 'Unassigned') return;
+    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label, color:p.color_hex};
+  });
+  document.getElementById('chartLegend').innerHTML = Object.values(desMap).map(function(d) {
+    return '<span class="leg-item"><span class="leg-dot" style="background:'+d.color+';"></span>'+d.label+'</span>';
   }).join('');
 }
 
-var chart = null;
-function buildChart(mode) {
-  if (!DESIGNER_SUMMARY.length) return;
+function buildChart(mode, data) {
   if (typeof Chart === 'undefined') { console.warn('Chart.js not loaded'); return; }
-  // Destroy old chart and replace canvas to avoid Chart.js reuse bugs
+  var desMap = {};
+  data.forEach(function(p) {
+    if (p.designer === 'Unassigned') return;
+    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0, time_billing:0, _rev:0, _prof:0};
+    desMap[p.designer].revenue      += p.revenue;
+    desMap[p.designer].profit       += p.profit;
+    desMap[p.designer].time_billing += p.time_billing;
+    desMap[p.designer]._rev         += p.revenue;
+    desMap[p.designer]._prof        += p.profit;
+  });
+  Object.values(desMap).forEach(function(d) {
+    d.margin = d._rev > 0 ? Math.round(d._prof/d._rev*1000)/10 : 0;
+  });
+  var summary = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
+  if (!summary.length) return;
+
   if (chart) { chart.destroy(); chart = null; }
   var wrap = document.getElementById('mainChart').parentNode;
   wrap.innerHTML = '<canvas id="mainChart"></canvas>';
   var ctx = document.getElementById('mainChart').getContext('2d');
-  var labels = DESIGNER_SUMMARY.map(function(d){return d.label;});
-  var vals   = DESIGNER_SUMMARY.map(function(d){
+  var labels = summary.map(function(d){return d.label;});
+  var vals   = summary.map(function(d){
     return mode==='profit'?d.profit : mode==='revenue'?d.revenue : mode==='margin'?d.margin : d.time_billing;
   });
   var fmtFn = mode==='margin' ? function(v){return v.toFixed(1)+'%';} : function(v){return fmt(v);};
+
   chart = new Chart(ctx, {
     type:'bar',
     data:{
       labels: labels,
       datasets:[{
         data: vals,
-        backgroundColor: DESIGNER_SUMMARY.map(function(d){return d.color_hex+'cc';}),
-        borderColor:     DESIGNER_SUMMARY.map(function(d){return d.color_hex;}),
+        backgroundColor: summary.map(function(d){return d.color+'cc';}),
+        borderColor:     summary.map(function(d){return d.color;}),
         borderWidth:1, borderRadius:2, borderSkipped:'bottom'
       }]
     },
@@ -450,44 +305,45 @@ function buildChart(mode) {
         legend:{display:false},
         tooltip:{
           callbacks:{label:function(c){return ' '+fmtFn(c.raw);}},
-          backgroundColor:'rgba(28,26,22,0.92)',titleColor:'#a09890',bodyColor:'#f7f4ee',
+          backgroundColor:'rgba(28,26,22,0.92)', titleColor:'#a09890', bodyColor:'#f7f4ee',
           padding:12, cornerRadius:2
         }
       },
       scales:{
         x:{grid:{display:false},border:{display:false},ticks:{color:'#a09890',font:{size:11}}},
         y:{grid:{color:'rgba(28,26,22,0.04)'},border:{display:false},
-          ticks:{color:'#a09890',font:{size:11},callback:function(v){return fmtFn(v);}}}
+           ticks:{color:'#a09890',font:{size:11},callback:function(v){return fmtFn(v);}}}
       }
     }
   });
+  currentChartMode = mode;
 }
+
 function switchChart(mode, btn) {
   document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
-  buildChart(mode);
+  var data = tState.filtered || ALL_PROJECTS;
+  buildChart(mode, data);
 }
 
 // ── Table ──
-
-function buildDesFilterBtns() {
+function buildDesFilterBtns(data) {
   var row = document.getElementById('desFiltRow');
   row.innerHTML = '<button class="f-btn on" onclick="setDesFilter(\'All\',this)">All</button>';
   var seen = {};
-  ALL_PROJECTS.forEach(function(p) {
-    if (!seen[p.designer]) {
-      seen[p.designer] = true;
-      var btn = document.createElement('button');
-      btn.className = 'f-btn';
-      btn.textContent = p.designer_label;
-      btn.onclick = (function(des) { return function() { setDesFilter(des, this); }; })(p.designer);
-      row.appendChild(btn);
-    }
+  data.forEach(function(p) {
+    if (p.designer === 'Unassigned' || seen[p.designer]) return;
+    seen[p.designer] = true;
+    var btn = document.createElement('button');
+    btn.className = 'f-btn';
+    btn.textContent = p.designer_label;
+    btn.onclick = (function(des) { return function() { setDesFilter(des, this); }; })(p.designer);
+    row.appendChild(btn);
   });
 }
 
 function renderTable() {
-  var source = (tState.filtered && tState.filtered !== ALL_PROJECTS) ? tState.filtered : ALL_PROJECTS;
+  var source = tState.filtered || ALL_PROJECTS;
   var rows = source.filter(function(p) {
     if (tState.des !== 'All' && p.designer !== tState.des) return false;
     if (tState.margin === 'high' && p.margin <= 50)  return false;
@@ -528,212 +384,89 @@ function renderTable() {
         '</div></td></tr>';
     }).join('');
   } catch(e) {
-    body.innerHTML = '<tr><td colspan="6" class="tbl-empty">Error rendering table: ' + e.message + '</td></tr>';
-    console.error('renderTable error:', e);
+    body.innerHTML = '<tr><td colspan="6" class="tbl-empty">Error: ' + e.message + '</td></tr>';
   }
 }
 
-function activateBtn(btn, rowId, color) {
-  document.querySelectorAll(rowId + ' .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
-  btn.classList.add('on'); btn.style.background=color; btn.style.borderColor=color; btn.style.color='white';
-}
-function setDesFilter(val,btn) { tState.des=val; activateBtn(btn,'#desFiltRow',val==='All'?'#1c1a16':'#1c1a16'); renderTable(); }
-function setFilt(type,val,btn,rowId) { tState[type]=val; activateBtn(btn,rowId,'#1c1a16'); renderTable(); }
-function doSearch(v) { tState.search=v.toLowerCase(); renderTable(); }
-function setSort(key,btn) {
-  tState.dir = tState.sort===key ? tState.dir*-1 : (key==='client'?1:-1);
-  tState.sort = key;
-  document.querySelectorAll('.s-btn').forEach(function(b){b.classList.remove('on');});
-  document.querySelectorAll('[id^="sa-"]').forEach(function(e){e.textContent='';});
-  if(btn) btn.classList.add('on');
-  var el = document.getElementById('sa-'+key);
-  if(el) el.textContent = tState.dir===-1?'↓':'↑';
-  renderTable();
-}
-
-// ── DATE FILTERING ──────────────────────────────────────────────
-var dState = { year: 'all', month: 'all', compare: null };
-
-function getMonthlyProjects(year, month) {
-  // Returns a projected version of ALL_PROJECTS filtered/aggregated by date
-  if (year === 'all' && month === 'all') return ALL_PROJECTS;
-
-  return ALL_PROJECTS.map(function(p) {
-    var md = p.monthly_data || {};
-    if (!Object.keys(md).length) {
-      // No monthly data — include if no date filter, exclude otherwise
-      return null;
-    }
-    var keys = Object.keys(md).filter(function(k) {
-      var parts = k.split('-');
-      var ky = parts[0]; var km = parts[1];
-      if (year !== 'all' && ky !== year) return false;
-      if (month !== 'all' && km !== month) return false;
-      return true;
-    });
-    if (!keys.length) return null;
-    var rev = 0, prof = 0, tb = 0;
-    keys.forEach(function(k) {
-      rev  += md[k].revenue      || 0;
-      prof += md[k].profit       || 0;
-      tb   += md[k].time_billing || 0;
-    });
-    var margin = rev > 0 ? Math.round(prof / rev * 1000) / 10 : 0;
-    return Object.assign({}, p, { revenue: rev, profit: prof, time_billing: tb, margin: margin });
-  }).filter(Boolean);
-}
-
+// ── Date filter controls ──
 function buildYearBtns() {
-  var years = new Set();
+  var years = {};
   ALL_PROJECTS.forEach(function(p) {
-    Object.keys(p.monthly_data || {}).forEach(function(k) { years.add(k.split('-')[0]); });
+    Object.keys(p.monthly_data || {}).forEach(function(k) { years[k.split('-')[0]] = true; });
   });
-  if (!years.size) return;
+  var yearList = Object.keys(years).sort();
+  if (!yearList.length) return;
   var row = document.getElementById('yearRow');
-  var html = '<button class="f-btn on" onclick="setYear('all',this)">All</button>';
-  Array.from(years).sort().forEach(function(y) {
-    html += '<button class="f-btn" onclick="setYear('' + y + '',this)">' + y + '</button>';
+  var html = '<button class="f-btn on" data-y="all" onclick="setYear(\'all\',this)">All</button>';
+  yearList.forEach(function(y) {
+    html += '<button class="f-btn" data-y="' + y + '" onclick="setYear(\'' + y + '\',this)">' + y + '</button>';
   });
   row.innerHTML = html;
   document.getElementById('dateFilterBar').style.display = 'flex';
 }
 
 function setYear(val, btn) {
-  dState.year = val; dState.compare = null;
-  activateBtn(btn, '#yearRow', '#1c1a16');
+  dState.year = val;
+  document.querySelectorAll('#yearRow .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
+  btn.classList.add('on'); btn.style.background='#1c1a16'; btn.style.borderColor='#1c1a16'; btn.style.color='white';
   refreshAll();
 }
+
 function setMonth(val, btn) {
-  dState.month = val; dState.compare = null;
-  activateBtn(btn, '#monthRow', '#1c1a16');
+  dState.month = val;
+  document.querySelectorAll('#monthRow .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
+  btn.classList.add('on'); btn.style.background='#1c1a16'; btn.style.borderColor='#1c1a16'; btn.style.color='white';
   refreshAll();
 }
-function setCompare(mode, btn) {
-  dState.compare = mode; dState.month = 'all';
-  activateBtn(btn, '#compareRow', '#1c1a16');
-  if (mode === 'ly_cy') renderLyCy();
-  else if (mode === 'ytd') { dState.year = 'all'; refreshAll(); }
-}
+
 function clearDateFilters() {
-  dState = { year: 'all', month: 'all', compare: null };
-  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn').forEach(function(b) {
-    b.classList.remove('on'); b.style.cssText = '';
-  });
-  document.querySelector('#yearRow .f-btn').classList.add('on');
-  document.querySelector('#monthRow .f-btn').classList.add('on');
+  dState = {year:'all', month:'all'};
+  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
+  var firstY = document.querySelector('#yearRow .f-btn');  if (firstY) firstY.classList.add('on');
+  var firstM = document.querySelector('#monthRow .f-btn'); if (firstM) firstM.classList.add('on');
   refreshAll();
 }
 
 function refreshAll() {
-  var filtered = getMonthlyProjects(dState.year, dState.month);
-  renderKPIsFromData(filtered);
-  renderDesignerBarsFromData(filtered);
-  renderLegend();
-  buildChartFromData('profit', filtered);
+  var filtered = filterByDate(ALL_PROJECTS);
   tState.filtered = filtered;
+  renderKPIs(filtered);
+  renderDesignerBars(filtered);
+  renderLegend(filtered);
+  buildChart(currentChartMode, filtered);
+  renderTable();
+  buildDesFilterBtns(filtered);
+}
+
+// ── Table filter controls ──
+function activateBtn(btn, rowId, color) {
+  document.querySelectorAll(rowId + ' .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
+  btn.classList.add('on'); btn.style.background=color; btn.style.borderColor=color; btn.style.color='white';
+}
+function setDesFilter(val, btn) { tState.des=val; activateBtn(btn,'#desFiltRow','#1c1a16'); renderTable(); }
+function setFilt(type, val, btn, rowId) { tState[type]=val; activateBtn(btn,rowId,'#1c1a16'); renderTable(); }
+function doSearch(v) { tState.search=v.toLowerCase(); renderTable(); }
+function setSort(key, btn) {
+  tState.dir = tState.sort===key ? tState.dir*-1 : (key==='client'?1:-1);
+  tState.sort = key;
+  document.querySelectorAll('.s-btn').forEach(function(b){b.classList.remove('on');});
+  document.querySelectorAll('[id^="sa-"]').forEach(function(e){e.textContent='';});
+  if (btn) btn.classList.add('on');
+  var el = document.getElementById('sa-'+key);
+  if (el) el.textContent = tState.dir===-1?'↓':'↑';
   renderTable();
 }
 
-// Extend renderKPIs to accept data param
-function renderKPIsFromData(data) {
-  var totalRev    = data.reduce(function(s,p){return s+p.revenue;},0);
-  var totalProfit = data.reduce(function(s,p){return s+p.profit;},0);
-  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100).toFixed(1) : 0;
-  var totalTB     = data.reduce(function(s,p){return s+p.time_billing;},0);
-  var label = dState.year !== 'all' ? dState.year + (dState.month !== 'all' ? '-' + dState.month : '') : 'All periods';
-  document.getElementById('kpiGrid').innerHTML =
-    kpi('Total Revenue',  fmt(totalRev),    label) +
-    kpi('Total Profit',   fmt(totalProfit), label, true) +
-    kpi('Overall Margin', totalMargin + '%','Blended profit rate') +
-    kpi('Time Billing',   fmt(totalTB),     label);
+// ── Init ──
+if (ALL_PROJECTS.length) {
+  tState.filtered = ALL_PROJECTS;
+  renderKPIs(ALL_PROJECTS);
+  renderDesignerBars(ALL_PROJECTS);
+  renderLegend(ALL_PROJECTS);
+  buildChart('profit', ALL_PROJECTS);
+  renderTable();
+  buildDesFilterBtns(ALL_PROJECTS);
+  buildYearBtns();
 }
-
-function renderDesignerBarsFromData(data) {
-  var desMap = {};
-  data.forEach(function(p) {
-    if (p.designer === 'Unassigned') return;
-    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label,color:p.color_hex,revenue:0,profit:0,margin:0};
-    desMap[p.designer].revenue += p.revenue;
-    desMap[p.designer].profit  += p.profit;
-  });
-  Object.values(desMap).forEach(function(d) {
-    d.margin = d.revenue > 0 ? Math.round(d.profit/d.revenue*1000)/10 : 0;
-  });
-  var byRev = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
-  var maxRev = byRev.length ? byRev[0].revenue : 1;
-  document.getElementById('revBars').innerHTML = byRev.map(function(d) {
-    var pct = (d.revenue/maxRev*100).toFixed(0);
-    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color+';"></div></div>' +
-      '<span class="des-num">'+fmt(d.revenue)+'</span></div>';
-  }).join('');
-  var byMar = Object.values(desMap).sort(function(a,b){return b.margin-a.margin;});
-  var maxMar = byMar.length ? byMar[0].margin : 1;
-  document.getElementById('marginBars').innerHTML = byMar.map(function(d) {
-    var pct = (d.margin/maxMar*100).toFixed(0);
-    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;opacity:.8;background:'+d.color+';"></div></div>' +
-      '<span class="des-pct" style="color:'+d.color+';">'+d.margin+'%</span></div>';
-  }).join('');
-}
-
-function buildChartFromData(mode, data) {
-  var desMap = {};
-  data.forEach(function(p) {
-    if (p.designer === 'Unassigned') return;
-    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label,color:p.color_hex,revenue:0,profit:0,time_billing:0,margin:0,_rev:0,_prof:0};
-    desMap[p.designer].revenue       += p.revenue;
-    desMap[p.designer].profit        += p.profit;
-    desMap[p.designer].time_billing  += p.time_billing;
-    desMap[p.designer]._rev          += p.revenue;
-    desMap[p.designer]._prof         += p.profit;
-  });
-  Object.values(desMap).forEach(function(d) {
-    d.margin = d._rev > 0 ? Math.round(d._prof/d._rev*1000)/10 : 0;
-  });
-  var summary = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
-  if (!summary.length) return;
-
-  if (chart) { chart.destroy(); chart = null; }
-  var wrap = document.getElementById('mainChart').parentNode;
-  wrap.innerHTML = '<canvas id="mainChart"></canvas>';
-  var ctx = document.getElementById('mainChart').getContext('2d');
-  var labels = summary.map(function(d){return d.label;});
-  var vals   = summary.map(function(d){
-    return mode==='profit'?d.profit:mode==='revenue'?d.revenue:mode==='margin'?d.margin:d.time_billing;
-  });
-  var fmtFn = mode==='margin'?function(v){return v.toFixed(1)+'%';}:function(v){return fmt(v);};
-  chart = new Chart(ctx, {
-    type:'bar',
-    data:{ labels:labels, datasets:[{
-      data:vals,
-      backgroundColor:summary.map(function(d){return d.color+'cc';}),
-      borderColor:summary.map(function(d){return d.color;}),
-      borderWidth:1,borderRadius:2,borderSkipped:'bottom'
-    }]},
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+fmtFn(c.raw);}},
-        backgroundColor:'rgba(28,26,22,0.92)',titleColor:'#a09890',bodyColor:'#f7f4ee',padding:12,cornerRadius:2}},
-      scales:{
-        x:{grid:{display:false},border:{display:false},ticks:{color:'#a09890',font:{size:11}}},
-        y:{grid:{color:'rgba(28,26,22,0.04)'},border:{display:false},ticks:{color:'#a09890',font:{size:11},callback:function(v){return fmtFn(v);}}}
-      }
-    }
-  });
-  currentChartMode = mode;
-  currentChartData = data;
-}
-
-var currentChartMode = 'profit';
-var currentChartData = null;
-
-function switchChart(mode, btn) {
-  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
-  btn.classList.add('active');
-  currentChartMode = mode;
-  buildChartFromData(mode, currentChartData || ALL_PROJECTS);
-}
-
 </script>
 {% endblock %}

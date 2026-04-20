@@ -98,22 +98,16 @@ class Project(Base):
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
-    # Add new columns if they don't exist (safe migration)
-    try:
-        with engine.connect() as conn:
-            for col, typedef in [
-                ('monthly_data', 'JSONB'),
-                ('date_min',     'VARCHAR'),
-                ('date_max',     'VARCHAR'),
-            ]:
-                try:
-                    conn.execute(
-                        __import__('sqlalchemy').text(
-                            f"ALTER TABLE projects ADD COLUMN IF NOT EXISTS {col} {typedef}"
-                        )
-                    )
-                    conn.commit()
-                except Exception:
-                    conn.rollback()
-    except Exception as e:
-        print(f"Migration note: {e}")
+    # Add new columns if they don't exist (safe incremental migration)
+    from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE projects ADD COLUMN IF NOT EXISTS monthly_data JSONB",
+        "ALTER TABLE projects ADD COLUMN IF NOT EXISTS date_min VARCHAR",
+        "ALTER TABLE projects ADD COLUMN IF NOT EXISTS date_max VARCHAR",
+    ]
+    for sql in migrations:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        except Exception as e:
+            print(f"Migration '{sql}' skipped: {e}")
