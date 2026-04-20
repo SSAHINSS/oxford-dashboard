@@ -248,6 +248,11 @@ function filterByDate(projects) {
 
 // ── Rendering ──
 function renderKPIs(data) {
+  // If period comparison has 2+ periods, show all of them per card
+  if (compareState && compareState.periods && compareState.periods.length >= 2) {
+    renderKPIsCompare();
+    return;
+  }
   var totalRev    = data.reduce(function(s,p){return s+p.revenue;},0);
   var totalProfit = data.reduce(function(s,p){return s+p.profit;},0);
   var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100).toFixed(1) : '0.0';
@@ -262,6 +267,55 @@ function renderKPIs(data) {
     kpi('Total Profit',   fmt(totalProfit), label, true) +
     kpi('Overall Margin', totalMargin+'%',  'Blended profit rate') +
     kpi('Time Billing',   fmt(totalTB),     label);
+}
+
+function renderKPIsCompare() {
+  // For each period, compute totals
+  var periodTotals = compareState.periods.map(function(period, idx) {
+    var rev = 0, prof = 0, tb = 0;
+    ALL_PROJECTS.forEach(function(p) {
+      var md = p.monthly_data || {};
+      Object.keys(md).forEach(function(k) {
+        var parts = k.split('-');
+        if (period.year !== 'all' && parts[0] !== period.year) return;
+        if (period.month !== 'all' && parts[1] !== period.month) return;
+        rev  += md[k].revenue      || 0;
+        prof += md[k].profit       || 0;
+        tb   += md[k].time_billing || 0;
+      });
+    });
+    var margin = rev > 0 ? Math.round(prof/rev*1000)/10 : 0;
+    return {
+      label: periodLabel(period),
+      color: PERIOD_COLORS[idx % PERIOD_COLORS.length],
+      revenue: rev, profit: prof, margin: margin, time_billing: tb
+    };
+  });
+
+  document.getElementById('kpiGrid').innerHTML =
+    kpiMulti('Total Revenue',  periodTotals, 'revenue',      fmt) +
+    kpiMulti('Total Profit',   periodTotals, 'profit',       fmt,  true) +
+    kpiMulti('Overall Margin', periodTotals, 'margin',       function(v){return (v||0).toFixed(1)+'%';}) +
+    kpiMulti('Time Billing',   periodTotals, 'time_billing', fmt);
+}
+
+function kpiMulti(label, periods, metric, fmtFn, accent) {
+  if (!periods.length) return kpi(label, '—', 'No data');
+  // Primary = first (latest) period
+  var primary = periods[0];
+  var rows = periods.map(function(p, idx) {
+    var val = fmtFn(p[metric]);
+    var isPrimary = idx === 0;
+    return '<div class="kpi-row' + (isPrimary ? ' primary' : '') + '">' +
+      '<span class="kpi-row-dot" style="background:' + p.color + ';"></span>' +
+      '<span class="kpi-row-label">' + p.label + '</span>' +
+      '<span class="kpi-row-val' + (accent && isPrimary ? ' accent' : '') + '">' + val + '</span>' +
+    '</div>';
+  }).join('');
+  return '<div class="kpi-card compare">' +
+    '<p class="kpi-label">' + label + '</p>' +
+    '<div class="kpi-compare-rows">' + rows + '</div>' +
+  '</div>';
 }
 
 function renderDesignerBars(data) {
@@ -568,6 +622,7 @@ function updateComparePeriod(sel) {
   var key = sel.dataset.key;
   compareState.periods[idx][key] = sel.value;
   renderCompareChart();
+  renderKPIs(tState.filtered || ALL_PROJECTS);
 }
 
 function addComparePeriod() {
@@ -579,12 +634,14 @@ function addComparePeriod() {
   compareState.periods.push({year: last ? last.year : 'all', month: last ? last.month : 'all'});
   renderComparePeriods();
   renderCompareChart();
+  renderKPIs(tState.filtered || ALL_PROJECTS);
 }
 
 function removeComparePeriod(idx) {
   compareState.periods.splice(idx, 1);
   renderComparePeriods();
   renderCompareChart();
+  renderKPIs(tState.filtered || ALL_PROJECTS);
 }
 
 function setCompareChartType(type, btn) {
