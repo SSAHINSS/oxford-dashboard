@@ -214,6 +214,22 @@ def dashboard(
     })
 
 
+@app.post("/periods/{period_id}/delete")
+def delete_period(
+    period_id:    int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    period = db.query(Period).filter(Period.id == period_id).first()
+    if not period:
+        raise HTTPException(status_code=404)
+    # Delete all projects for this period first
+    db.query(Project).filter(Project.period_id == period_id).delete()
+    db.delete(period)
+    db.commit()
+    return RedirectResponse(url="/", status_code=302)
+
+
 # ═══════════════════════════════════════════
 # CLIENTS — list + detail + reassign
 # ═══════════════════════════════════════════

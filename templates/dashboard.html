@@ -20,6 +20,12 @@
     {% endif %}
     {% if selected_period %}
     <span class="period-meta">{{ selected_period.uploaded_at.strftime('%b %d, %Y') }}</span>
+    {% if user.role == 'admin' %}
+    <form method="post" action="/periods/{{ selected_period.id }}/delete" style="display:inline;"
+          onsubmit="return confirm('Delete period &quot;{{ selected_period.label }}&quot; and all its data?')">
+      <button class="btn-ghost small" type="submit">Delete period</button>
+    </form>
+    {% endif %}
     {% endif %}
   </div>
   {% if user.role == 'admin' %}
