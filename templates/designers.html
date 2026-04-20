@@ -18,17 +18,28 @@
   <div>
     <h2 class="section-title">Current roster</h2>
     <div class="designer-list" id="designerList">
-      {% for d in designers %}
+      {% for row in designer_rows %}
+      {% set d = row.d %}
       <div class="designer-item {% if not d.active %}inactive{% endif %}">
         <div class="designer-swatch" style="background:{{ d.color_hex }};"></div>
         <div class="designer-info">
           <div class="designer-name">{{ d.label }}</div>
-          <div class="designer-slug">{{ d.name }}</div>
+          <div class="designer-slug">{{ d.name }} · <span style="color:var(--ink-light);">{{ row.client_count }} client{{ 's' if row.client_count != 1 else '' }}</span></div>
         </div>
         <div class="designer-actions">
           <button class="btn-ghost small" onclick="openEdit({{ d.id }}, '{{ d.label }}', '{{ d.color_hex }}')">Edit</button>
+          {% if row.client_count > 0 %}
+          <form method="post" action="/designers/{{ d.id }}/unassign-all" style="display:inline;"
+                onsubmit="return confirm('Unassign all {{ row.client_count }} client(s) currently assigned to &quot;{{ d.label }}&quot;?\nThey will become unassigned (no designer) and can be reassigned later.');">
+            <button class="btn-ghost small" type="submit">Unassign clients</button>
+          </form>
+          {% endif %}
           <form method="post" action="/designers/{{ d.id }}/toggle" style="display:inline;">
             <button class="btn-ghost small">{{ 'Reactivate' if not d.active else 'Deactivate' }}</button>
+          </form>
+          <form method="post" action="/designers/{{ d.id }}/delete" style="display:inline;"
+                onsubmit="return confirm('Delete &quot;{{ d.label }}&quot; permanently?{% if row.client_count > 0 %}\n\nThis will unassign {{ row.client_count }} client(s) first, then remove the designer entirely.{% endif %}');">
+            <button class="btn-ghost small" type="submit" style="color:var(--neg);">Delete</button>
           </form>
         </div>
       </div>

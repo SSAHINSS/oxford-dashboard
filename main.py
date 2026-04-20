@@ -487,7 +487,21 @@ async def upload_confirm(request: Request, current_user: User = Depends(require_
 @app.get("/designers", response_class=HTMLResponse)
 def designers_page(request: Request, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
     designers = db.query(Designer).order_by(Designer.name).all()
-    return templates.TemplateResponse("designers.html", {"request": request, "user": current_user, "designers": designers})
+    # Count clients per designer (for display + safety)
+    counts = dict(
+        db.query(Client.designer_id, func.count(Client.id))
+        .filter(Client.designer_id.isnot(None))
+        .group_by(Client.designer_id)
+        .all()
+    )
+    designer_rows = [
+        {"d": d, "client_count": counts.get(d.id, 0)}
+        for d in designers
+    ]
+    return templates.TemplateResponse("designers.html", {
+        "request": request, "user": current_user,
+        "designer_rows": designer_rows
+    })
 
 @app.post("/designers/add")
 def add_designer(name: str = Form(...), label: str = Form(...), color_hex: str = Form(...),
@@ -518,6 +532,32 @@ def edit_designer(designer_id: int, label: str = Form(...), color_hex: str = For
         raise HTTPException(status_code=404)
     d.label     = label.strip()
     d.color_hex = color_hex
+    db.commit()
+    return RedirectResponse(url="/designers", status_code=302)
+
+@app.post("/designers/{designer_id}/unassign-all")
+def unassign_all_clients(designer_id: int,
+                         current_user: User = Depends(require_admin),
+                         db: Session = Depends(get_db)):
+    """Set designer_id=NULL on all clients currently assigned to this designer."""
+    d = db.query(Designer).filter(Designer.id == designer_id).first()
+    if not d:
+        raise HTTPException(status_code=404)
+    db.query(Client).filter(Client.designer_id == designer_id).update({Client.designer_id: None})
+    db.commit()
+    return RedirectResponse(url="/designers", status_code=302)
+
+@app.post("/designers/{designer_id}/delete")
+def delete_designer(designer_id: int,
+                    current_user: User = Depends(require_admin),
+                    db: Session = Depends(get_db)):
+    """Delete a designer. Safety: unassigns any clients first to avoid FK issues."""
+    d = db.query(Designer).filter(Designer.id == designer_id).first()
+    if not d:
+        raise HTTPException(status_code=404)
+    # Unassign all clients first (so we don't orphan FKs)
+    db.query(Client).filter(Client.designer_id == designer_id).update({Client.designer_id: None})
+    db.delete(d)
     db.commit()
     return RedirectResponse(url="/designers", status_code=302)
 
