@@ -907,10 +907,12 @@ function setCompareMetric(m, btn) {
 
 function aggregatePeriodByDesigner(period) {
   var months = resolveMonths(period);
+  var hasDes = dState.designers.length > 0;
   var desMap = {};
   for (var i = 0; i < ALL_PROJECTS.length; i++) {
     var p = ALL_PROJECTS[i];
     if (p.designer === 'Unassigned') continue;
+    if (hasDes && dState.designers.indexOf(p.designer) < 0) continue;
     var md = p.monthly_data || {};
     var keys = Object.keys(md);
     var rev = 0, prof = 0, tb = 0;
@@ -936,13 +938,16 @@ function aggregatePeriodByDesigner(period) {
 }
 
 function aggregatePeriodByMonth(period) {
+  var hasDes = dState.designers.length > 0;
   var monthMap = {};
   for (var i = 1; i <= 12; i++) {
     var m = i < 10 ? '0'+i : ''+i;
     monthMap[m] = {revenue:0, profit:0, time_billing:0};
   }
   for (var i = 0; i < ALL_PROJECTS.length; i++) {
-    var md = ALL_PROJECTS[i].monthly_data || {};
+    var p = ALL_PROJECTS[i];
+    if (hasDes && dState.designers.indexOf(p.designer) < 0) continue;
+    var md = p.monthly_data || {};
     var keys = Object.keys(md);
     for (var j = 0; j < keys.length; j++) {
       var k = keys[j], parts = k.split('-');
@@ -1136,6 +1141,7 @@ function refreshAll() {
   buildChart(currentChartMode, filtered);
   renderTable();
   buildDesFilterBtns(filtered);
+  renderCompareChart();
 }
 
 // ═══════════════════════════════════════════════════════
