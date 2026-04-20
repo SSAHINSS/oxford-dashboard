@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}Oxford Design Studio{% endblock %}</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/main.css">
 {% block head %}{% endblock %}
 </head>
@@ -13,7 +13,7 @@
 {% if user is defined and user %}
 <nav class="nav">
   <div class="nav-brand">
-    <span class="nav-firm">Oxford Design Studio</span>
+    <span class="nav-firm">Oxford Design</span>
   </div>
   <div class="nav-links">
     <a href="/"        class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>

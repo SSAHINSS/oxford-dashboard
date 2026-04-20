@@ -270,15 +270,15 @@ function renderKPIs(data) {
 }
 
 function renderKPIsCompare() {
-  // For each period, compute totals
   var periodTotals = compareState.periods.map(function(period, idx) {
+    var range = getPeriodRange(period);
     var rev = 0, prof = 0, tb = 0;
     ALL_PROJECTS.forEach(function(p) {
       var md = p.monthly_data || {};
       Object.keys(md).forEach(function(k) {
         var parts = k.split('-');
         if (period.year !== 'all' && parts[0] !== period.year) return;
-        if (period.month !== 'all' && parts[1] !== period.month) return;
+        if (!monthInRange(k, range[0], range[1])) return;
         rev  += md[k].revenue      || 0;
         prof += md[k].profit       || 0;
         tb   += md[k].time_billing || 0;
@@ -301,20 +301,60 @@ function renderKPIsCompare() {
 
 function kpiMulti(label, periods, metric, fmtFn, accent) {
   if (!periods.length) return kpi(label, '—', 'No data');
-  // Primary = first (latest) period
-  var primary = periods[0];
-  var rows = periods.map(function(p, idx) {
-    var val = fmtFn(p[metric]);
-    var isPrimary = idx === 0;
-    return '<div class="kpi-row' + (isPrimary ? ' primary' : '') + '">' +
-      '<span class="kpi-row-dot" style="background:' + p.color + ';"></span>' +
+  // Sort periods so latest year comes first; within same year, latest month first
+  var sorted = periods.slice().sort(function(a, b) {
+    var ay = a._raw.year === 'all' ? '9999' : a._raw.year;
+    var by = b._raw.year === 'all' ? '9999' : b._raw.year;
+    if (ay !== by) return by.localeCompare(ay);
+    var am = a._raw.month === 'all' ? '99' : a._raw.month;
+    var bm = b._raw.month === 'all' ? '99' : b._raw.month;
+    return bm.localeCompare(am);
+  });
+
+  var primary = sorted[0];
+  var others  = sorted.slice(1);
+  var primaryVal = primary[metric] || 0;
+
+  // Main large number
+  var main = '<div class="kpi-primary-row">' +
+    '<span class="kpi-row-dot" style="background:' + primary.color + ';"></span>' +
+    '<div>' +
+      '<div class="kpi-primary-label">' + primary.label + '</div>' +
+      '<div class="kpi-value' + (accent ? ' accent' : '') + '">' + fmtFn(primaryVal) + '</div>' +
+    '</div>' +
+  '</div>';
+
+  // Delta rows for other periods
+  var deltas = others.map(function(p) {
+    var val = p[metric] || 0;
+    var delta, deltaHtml;
+    if (metric === 'margin') {
+      delta = primaryVal - val;
+      var arrow = delta > 0 ? '▲' : (delta < 0 ? '▼' : '—');
+      var cls = delta > 0 ? 'delta-up' : (delta < 0 ? 'delta-down' : '');
+      deltaHtml = '<span class="kpi-delta ' + cls + '">' + arrow + ' ' + Math.abs(delta).toFixed(1) + 'pts</span>';
+    } else {
+      if (val === 0) {
+        deltaHtml = '<span class="kpi-delta delta-neutral">—</span>';
+      } else {
+        delta = ((primaryVal - val) / Math.abs(val)) * 100;
+        var arrow = delta > 0 ? '▲' : (delta < 0 ? '▼' : '—');
+        var cls = delta > 0 ? 'delta-up' : (delta < 0 ? 'delta-down' : '');
+        deltaHtml = '<span class="kpi-delta ' + cls + '">' + arrow + ' ' + Math.abs(delta).toFixed(0) + '%</span>';
+      }
+    }
+    return '<div class="kpi-compare-row">' +
+      '<span class="kpi-row-dot small" style="background:' + p.color + ';"></span>' +
       '<span class="kpi-row-label">' + p.label + '</span>' +
-      '<span class="kpi-row-val' + (accent && isPrimary ? ' accent' : '') + '">' + val + '</span>' +
+      '<span class="kpi-row-val-sm">' + fmtFn(val) + '</span>' +
+      deltaHtml +
     '</div>';
   }).join('');
+
   return '<div class="kpi-card compare">' +
     '<p class="kpi-label">' + label + '</p>' +
-    '<div class="kpi-compare-rows">' + rows + '</div>' +
+    main +
+    (deltas ? '<div class="kpi-compare-rows">' + deltas + '</div>' : '') +
   '</div>';
 }
 
@@ -576,9 +616,11 @@ function getAvailableYears() {
 
 function initComparePeriods() {
   var years = getAvailableYears();
-  // Default: show the latest 3 years (or whatever is available)
-  compareState.periods = years.slice(-3).map(function(y) { return {year: y, month: 'all'}; });
-  if (!compareState.periods.length) compareState.periods = [{year:'all', month:'all'}];
+  // Latest 3 years, newest first
+  compareState.periods = years.slice(-3).reverse().map(function(y) {
+    return {year: y, preset: 'full', monthFrom: '01', monthTo: '12'};
+  });
+  if (!compareState.periods.length) compareState.periods = [{year:'all', preset:'full', monthFrom:'01', monthTo:'12'}];
 }
 
 function yearOptionsHtml(selected) {
@@ -591,25 +633,73 @@ function yearOptionsHtml(selected) {
 }
 
 function monthOptionsHtml(selected) {
-  var months = [['all','All months'],['01','Jan'],['02','Feb'],['03','Mar'],['04','Apr'],
-                ['05','May'],['06','Jun'],['07','Jul'],['08','Aug'],['09','Sep'],
-                ['10','Oct'],['11','Nov'],['12','Dec']];
-  return months.map(function(m) {
-    return '<option value="' + m[0] + '"' + (selected === m[0] ? ' selected' : '') + '>' + m[1] + '</option>';
-  }).join('');
+  var groups = [
+    {label: '', items: [['all','All months'], ['ytd','YTD (through today)']]},
+    {label: 'Quarters', items: [
+      ['q1','Q1 (Jan–Mar)'], ['q2','Q2 (Apr–Jun)'], ['q3','Q3 (Jul–Sep)'], ['q4','Q4 (Oct–Dec)']
+    ]},
+    {label: 'Halves', items: [
+      ['h1','H1 (Jan–Jun)'], ['h2','H2 (Jul–Dec)']
+    ]},
+    {label: 'Individual months', items: [
+      ['01','Jan'],['02','Feb'],['03','Mar'],['04','Apr'],['05','May'],['06','Jun'],
+      ['07','Jul'],['08','Aug'],['09','Sep'],['10','Oct'],['11','Nov'],['12','Dec']
+    ]}
+  ];
+  var html = '';
+  groups.forEach(function(g) {
+    if (g.label) html += '<optgroup label="' + g.label + '">';
+    g.items.forEach(function(m) {
+      html += '<option value="' + m[0] + '"' + (selected === m[0] ? ' selected' : '') + '>' + m[1] + '</option>';
+    });
+    if (g.label) html += '</optgroup>';
+  });
+  return html;
+}
+
+// Resolves a period month field to an array of "01"-"12" strings (or null = all)
+function resolveMonths(period) {
+  var m = period.month;
+  if (!m || m === 'all') return null;
+  if (m === 'q1') return ['01','02','03'];
+  if (m === 'q2') return ['04','05','06'];
+  if (m === 'q3') return ['07','08','09'];
+  if (m === 'q4') return ['10','11','12'];
+  if (m === 'h1') return ['01','02','03','04','05','06'];
+  if (m === 'h2') return ['07','08','09','10','11','12'];
+  if (m === 'ytd') {
+    var now = new Date();
+    var cur = now.getMonth() + 1;
+    var out = [];
+    for (var i = 1; i <= cur; i++) {
+      out.push(i < 10 ? '0' + i : '' + i);
+    }
+    return out;
+  }
+  return [m];  // single month
 }
 
 function renderComparePeriods() {
   var html = compareState.periods.map(function(p, idx) {
     var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
+    var showRange = p.preset === 'range';
     return '<div class="compare-period-row">' +
       '<span class="period-color" style="background:' + color + ';"></span>' +
       '<select class="compare-select" data-idx="' + idx + '" data-key="year" onchange="updateComparePeriod(this)">' +
         yearOptionsHtml(p.year) +
       '</select>' +
-      '<select class="compare-select" data-idx="' + idx + '" data-key="month" onchange="updateComparePeriod(this)">' +
-        monthOptionsHtml(p.month) +
+      '<select class="compare-select" data-idx="' + idx + '" data-key="preset" onchange="updateComparePeriod(this)">' +
+        presetOptionsHtml(p.preset) +
       '</select>' +
+      (showRange
+        ? '<select class="compare-select compare-range" data-idx="' + idx + '" data-key="monthFrom" onchange="updateComparePeriod(this)">' +
+            monthOptionsPlain(p.monthFrom) +
+          '</select>' +
+          '<span class="range-dash">to</span>' +
+          '<select class="compare-select compare-range" data-idx="' + idx + '" data-key="monthTo" onchange="updateComparePeriod(this)">' +
+            monthOptionsPlain(p.monthTo) +
+          '</select>'
+        : '') +
       (compareState.periods.length > 1 ?
         '<button class="x-btn" title="Remove" onclick="removeComparePeriod(' + idx + ')">×</button>' : '') +
       '</div>';
@@ -617,10 +707,62 @@ function renderComparePeriods() {
   document.getElementById('comparePeriods').innerHTML = html;
 }
 
+function presetOptionsHtml(selected) {
+  var presets = [
+    ['full','Full year'],
+    ['ytd','YTD'],
+    ['q1','Q1 (Jan–Mar)'],
+    ['q2','Q2 (Apr–Jun)'],
+    ['q3','Q3 (Jul–Sep)'],
+    ['q4','Q4 (Oct–Dec)'],
+    ['h1','H1 (Jan–Jun)'],
+    ['h2','H2 (Jul–Dec)'],
+    ['range','Custom range…']
+  ];
+  return presets.map(function(p) {
+    return '<option value="' + p[0] + '"' + (selected === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
+  }).join('');
+}
+
+function monthOptionsPlain(selected) {
+  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  var names  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months.map(function(m, i) {
+    return '<option value="' + m + '"' + (selected === m ? ' selected' : '') + '>' + names[i] + '</option>';
+  }).join('');
+}
+
+// Resolve a period's preset into a [fromMonth, toMonth] range
+function getPeriodRange(period) {
+  var now = new Date();
+  var currentMonth = (now.getMonth() + 1); // 1-12
+  var mm = function(n) { return n < 10 ? '0' + n : '' + n; };
+  switch (period.preset) {
+    case 'ytd':   return ['01', mm(currentMonth)];
+    case 'q1':    return ['01', '03'];
+    case 'q2':    return ['04', '06'];
+    case 'q3':    return ['07', '09'];
+    case 'q4':    return ['10', '12'];
+    case 'h1':    return ['01', '06'];
+    case 'h2':    return ['07', '12'];
+    case 'range': return [period.monthFrom || '01', period.monthTo || '12'];
+    default:      return ['01', '12']; // full year
+  }
+}
+
+function monthInRange(key, fromMonth, toMonth) {
+  var m = key.split('-')[1];
+  return m >= fromMonth && m <= toMonth;
+}
+
 function updateComparePeriod(sel) {
   var idx = parseInt(sel.dataset.idx);
   var key = sel.dataset.key;
   compareState.periods[idx][key] = sel.value;
+  // If preset changed to/from range, re-render the row to show/hide range inputs
+  if (key === 'preset') {
+    renderComparePeriods();
+  }
   renderCompareChart();
   renderKPIs(tState.filtered || ALL_PROJECTS);
 }
@@ -631,7 +773,12 @@ function addComparePeriod() {
     return;
   }
   var last = compareState.periods[compareState.periods.length - 1];
-  compareState.periods.push({year: last ? last.year : 'all', month: last ? last.month : 'all'});
+  compareState.periods.push({
+    year: last ? last.year : 'all',
+    preset: last ? last.preset : 'full',
+    monthFrom: last ? last.monthFrom : '01',
+    monthTo:   last ? last.monthTo   : '12'
+  });
   renderComparePeriods();
   renderCompareChart();
   renderKPIs(tState.filtered || ALL_PROJECTS);
@@ -659,6 +806,7 @@ function setCompareMetric(metric, btn) {
 }
 
 function aggregatePeriodByDesigner(period) {
+  var range = getPeriodRange(period);
   var desMap = {};
   ALL_PROJECTS.forEach(function(p) {
     if (p.designer === 'Unassigned') return;
@@ -667,7 +815,7 @@ function aggregatePeriodByDesigner(period) {
     Object.keys(md).forEach(function(k) {
       var parts = k.split('-');
       if (period.year !== 'all' && parts[0] !== period.year) return;
-      if (period.month !== 'all' && parts[1] !== period.month) return;
+      if (!monthInRange(k, range[0], range[1])) return;
       rev  += md[k].revenue      || 0;
       prof += md[k].profit       || 0;
       tb   += md[k].time_billing || 0;
@@ -687,6 +835,7 @@ function aggregatePeriodByDesigner(period) {
 }
 
 function aggregatePeriodByMonth(period) {
+  var range = getPeriodRange(period);
   var monthMap = {};
   for (var i = 1; i <= 12; i++) {
     var m = i < 10 ? '0' + i : '' + i;
@@ -697,6 +846,7 @@ function aggregatePeriodByMonth(period) {
     Object.keys(md).forEach(function(k) {
       var parts = k.split('-');
       if (period.year !== 'all' && parts[0] !== period.year) return;
+      if (!monthInRange(k, range[0], range[1])) return;
       var month = parts[1];
       if (!monthMap[month]) return;
       monthMap[month].revenue      += md[k].revenue      || 0;
@@ -711,10 +861,18 @@ function aggregatePeriodByMonth(period) {
 }
 
 function periodLabel(period) {
-  var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var m = period.month === 'all' ? '' : monthNames[parseInt(period.month)] + ' ';
   var y = period.year === 'all' ? 'All' : period.year;
-  return m + y;
+  var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var presetLabel = {
+    full: '', ytd: 'YTD ', q1: 'Q1 ', q2: 'Q2 ', q3: 'Q3 ', q4: 'Q4 ',
+    h1: 'H1 ', h2: 'H2 '
+  };
+  if (period.preset === 'range') {
+    var from = monthNames[parseInt(period.monthFrom || '01')];
+    var to   = monthNames[parseInt(period.monthTo   || '12')];
+    return from + '–' + to + ' ' + y;
+  }
+  return (presetLabel[period.preset] || '') + y;
 }
 
 function compareFmtFn(metric) {
@@ -827,8 +985,7 @@ function renderCompareLineChart(ctx) {
 
   var datasets = compareState.periods.map(function(p, idx) {
     var color = PERIOD_COLORS[idx % PERIOD_COLORS.length];
-    var periodForLine = {year: p.year, month: 'all'};
-    var monthData = aggregatePeriodByMonth(periodForLine);
+    var monthData = aggregatePeriodByMonth(p);
     var vals = ['01','02','03','04','05','06','07','08','09','10','11','12'].map(function(m) {
       return (monthData[m] || {})[metric] || 0;
     });
