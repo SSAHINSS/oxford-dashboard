@@ -278,9 +278,9 @@ function updateConfirmBtn() {
   var unassigned = Object.keys(assignments).filter(function(k) { return !assignments[k]; });
   var btn  = document.getElementById('confirmBtn');
   var hint = document.getElementById('confirmHint');
-  btn.disabled = unassigned.length > 0;
+  btn.disabled = false;
   hint.textContent = unassigned.length > 0
-    ? unassigned.length + ' client' + (unassigned.length > 1 ? 's' : '') + ' still need a designer'
+    ? unassigned.length + ' client' + (unassigned.length > 1 ? 's' : '') + ' unassigned — you can assign them later via the Clients page'
     : 'All clients assigned — ready to save';
 }
 
