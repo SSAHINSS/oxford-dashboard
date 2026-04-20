@@ -1,4 +1,5 @@
 import re
+import io
 from typing import Optional, List
 import pandas as pd
 
@@ -35,7 +36,7 @@ def parse_studio_export(file_bytes: bytes, filename: str) -> dict:
                   + blank separator row between clients
       - TIME BILLING appears as a Room value
     """
-    xl = pd.ExcelFile(file_bytes)
+    xl = pd.ExcelFile(io.BytesIO(file_bytes) if isinstance(file_bytes, bytes) else file_bytes)
     sheet_name = next(
         (s for s in xl.sheet_names if 'PROFIT' in s.upper()),
         xl.sheet_names[0]
