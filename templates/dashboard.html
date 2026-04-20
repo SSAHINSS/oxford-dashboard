@@ -3,7 +3,192 @@
 {% set active_page = "dashboard" %}
 
 {% block head %}
-<script src="/static/js/chart.umd.js"></script>
+<script src="/static/js/chart.umd.js">
+// ── DATE FILTERING ──────────────────────────────────────────────
+var dState = { year: 'all', month: 'all', compare: null };
+
+function getMonthlyProjects(year, month) {
+  // Returns a projected version of ALL_PROJECTS filtered/aggregated by date
+  if (year === 'all' && month === 'all') return ALL_PROJECTS;
+
+  return ALL_PROJECTS.map(function(p) {
+    var md = p.monthly_data || {};
+    if (!Object.keys(md).length) {
+      // No monthly data — include if no date filter, exclude otherwise
+      return null;
+    }
+    var keys = Object.keys(md).filter(function(k) {
+      var parts = k.split('-');
+      var ky = parts[0]; var km = parts[1];
+      if (year !== 'all' && ky !== year) return false;
+      if (month !== 'all' && km !== month) return false;
+      return true;
+    });
+    if (!keys.length) return null;
+    var rev = 0, prof = 0, tb = 0;
+    keys.forEach(function(k) {
+      rev  += md[k].revenue      || 0;
+      prof += md[k].profit       || 0;
+      tb   += md[k].time_billing || 0;
+    });
+    var margin = rev > 0 ? Math.round(prof / rev * 1000) / 10 : 0;
+    return Object.assign({}, p, { revenue: rev, profit: prof, time_billing: tb, margin: margin });
+  }).filter(Boolean);
+}
+
+function buildYearBtns() {
+  var years = new Set();
+  ALL_PROJECTS.forEach(function(p) {
+    Object.keys(p.monthly_data || {}).forEach(function(k) { years.add(k.split('-')[0]); });
+  });
+  if (!years.size) return;
+  var row = document.getElementById('yearRow');
+  var html = '<button class="f-btn on" onclick="setYear('all',this)">All</button>';
+  Array.from(years).sort().forEach(function(y) {
+    html += '<button class="f-btn" onclick="setYear('' + y + '',this)">' + y + '</button>';
+  });
+  row.innerHTML = html;
+  document.getElementById('dateFilterBar').style.display = 'flex';
+}
+
+function setYear(val, btn) {
+  dState.year = val; dState.compare = null;
+  activateBtn(btn, '#yearRow', '#1c1a16');
+  refreshAll();
+}
+function setMonth(val, btn) {
+  dState.month = val; dState.compare = null;
+  activateBtn(btn, '#monthRow', '#1c1a16');
+  refreshAll();
+}
+function setCompare(mode, btn) {
+  dState.compare = mode; dState.month = 'all';
+  activateBtn(btn, '#compareRow', '#1c1a16');
+  if (mode === 'ly_cy') renderLyCy();
+  else if (mode === 'ytd') { dState.year = 'all'; refreshAll(); }
+}
+function clearDateFilters() {
+  dState = { year: 'all', month: 'all', compare: null };
+  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn').forEach(function(b) {
+    b.classList.remove('on'); b.style.cssText = '';
+  });
+  document.querySelector('#yearRow .f-btn').classList.add('on');
+  document.querySelector('#monthRow .f-btn').classList.add('on');
+  refreshAll();
+}
+
+function refreshAll() {
+  var filtered = getMonthlyProjects(dState.year, dState.month);
+  renderKPIsFromData(filtered);
+  renderDesignerBarsFromData(filtered);
+  renderLegend();
+  buildChartFromData('profit', filtered);
+  tState.filtered = filtered;
+  renderTable();
+}
+
+// Extend renderKPIs to accept data param
+function renderKPIsFromData(data) {
+  var totalRev    = data.reduce(function(s,p){return s+p.revenue;},0);
+  var totalProfit = data.reduce(function(s,p){return s+p.profit;},0);
+  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100).toFixed(1) : 0;
+  var totalTB     = data.reduce(function(s,p){return s+p.time_billing;},0);
+  var label = dState.year !== 'all' ? dState.year + (dState.month !== 'all' ? '-' + dState.month : '') : 'All periods';
+  document.getElementById('kpiGrid').innerHTML =
+    kpi('Total Revenue',  fmt(totalRev),    label) +
+    kpi('Total Profit',   fmt(totalProfit), label, true) +
+    kpi('Overall Margin', totalMargin + '%','Blended profit rate') +
+    kpi('Time Billing',   fmt(totalTB),     label);
+}
+
+function renderDesignerBarsFromData(data) {
+  var desMap = {};
+  data.forEach(function(p) {
+    if (p.designer === 'Unassigned') return;
+    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label,color:p.color_hex,revenue:0,profit:0,margin:0};
+    desMap[p.designer].revenue += p.revenue;
+    desMap[p.designer].profit  += p.profit;
+  });
+  Object.values(desMap).forEach(function(d) {
+    d.margin = d.revenue > 0 ? Math.round(d.profit/d.revenue*1000)/10 : 0;
+  });
+  var byRev = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
+  var maxRev = byRev.length ? byRev[0].revenue : 1;
+  document.getElementById('revBars').innerHTML = byRev.map(function(d) {
+    var pct = (d.revenue/maxRev*100).toFixed(0);
+    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color+';"></div></div>' +
+      '<span class="des-num">'+fmt(d.revenue)+'</span></div>';
+  }).join('');
+  var byMar = Object.values(desMap).sort(function(a,b){return b.margin-a.margin;});
+  var maxMar = byMar.length ? byMar[0].margin : 1;
+  document.getElementById('marginBars').innerHTML = byMar.map(function(d) {
+    var pct = (d.margin/maxMar*100).toFixed(0);
+    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;opacity:.8;background:'+d.color+';"></div></div>' +
+      '<span class="des-pct" style="color:'+d.color+';">'+d.margin+'%</span></div>';
+  }).join('');
+}
+
+function buildChartFromData(mode, data) {
+  var desMap = {};
+  data.forEach(function(p) {
+    if (p.designer === 'Unassigned') return;
+    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label,color:p.color_hex,revenue:0,profit:0,time_billing:0,margin:0,_rev:0,_prof:0};
+    desMap[p.designer].revenue       += p.revenue;
+    desMap[p.designer].profit        += p.profit;
+    desMap[p.designer].time_billing  += p.time_billing;
+    desMap[p.designer]._rev          += p.revenue;
+    desMap[p.designer]._prof         += p.profit;
+  });
+  Object.values(desMap).forEach(function(d) {
+    d.margin = d._rev > 0 ? Math.round(d._prof/d._rev*1000)/10 : 0;
+  });
+  var summary = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
+  if (!summary.length) return;
+
+  if (chart) { chart.destroy(); chart = null; }
+  var wrap = document.getElementById('mainChart').parentNode;
+  wrap.innerHTML = '<canvas id="mainChart"></canvas>';
+  var ctx = document.getElementById('mainChart').getContext('2d');
+  var labels = summary.map(function(d){return d.label;});
+  var vals   = summary.map(function(d){
+    return mode==='profit'?d.profit:mode==='revenue'?d.revenue:mode==='margin'?d.margin:d.time_billing;
+  });
+  var fmtFn = mode==='margin'?function(v){return v.toFixed(1)+'%';}:function(v){return fmt(v);};
+  chart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:labels, datasets:[{
+      data:vals,
+      backgroundColor:summary.map(function(d){return d.color+'cc';}),
+      borderColor:summary.map(function(d){return d.color;}),
+      borderWidth:1,borderRadius:2,borderSkipped:'bottom'
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+fmtFn(c.raw);}},
+        backgroundColor:'rgba(28,26,22,0.92)',titleColor:'#a09890',bodyColor:'#f7f4ee',padding:12,cornerRadius:2}},
+      scales:{
+        x:{grid:{display:false},border:{display:false},ticks:{color:'#a09890',font:{size:11}}},
+        y:{grid:{color:'rgba(28,26,22,0.04)'},border:{display:false},ticks:{color:'#a09890',font:{size:11},callback:function(v){return fmtFn(v);}}}
+      }
+    }
+  });
+  currentChartMode = mode;
+  currentChartData = data;
+}
+
+var currentChartMode = 'profit';
+var currentChartData = null;
+
+function switchChart(mode, btn) {
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  currentChartMode = mode;
+  buildChartFromData(mode, currentChartData || ALL_PROJECTS);
+}
+
+</script>
 {% endblock %}
 
 {% block content %}
@@ -25,6 +210,40 @@
   {% if user.role == 'admin' %}
   <a href="/upload" class="btn-upload">↑ Load New Data</a>
   {% endif %}
+</div>
+
+<!-- Date filters -->
+<div class="date-filter-bar" id="dateFilterBar" style="display:none;">
+  <div class="date-filter-group">
+    <span class="tg-label">Year</span>
+    <div class="btn-row" id="yearRow"></div>
+  </div>
+  <div class="date-filter-group">
+    <span class="tg-label">Month</span>
+    <div class="btn-row" id="monthRow">
+      <button class="f-btn on" onclick="setMonth('all',this)">All</button>
+      <button class="f-btn" onclick="setMonth('01',this)">Jan</button>
+      <button class="f-btn" onclick="setMonth('02',this)">Feb</button>
+      <button class="f-btn" onclick="setMonth('03',this)">Mar</button>
+      <button class="f-btn" onclick="setMonth('04',this)">Apr</button>
+      <button class="f-btn" onclick="setMonth('05',this)">May</button>
+      <button class="f-btn" onclick="setMonth('06',this)">Jun</button>
+      <button class="f-btn" onclick="setMonth('07',this)">Jul</button>
+      <button class="f-btn" onclick="setMonth('08',this)">Aug</button>
+      <button class="f-btn" onclick="setMonth('09',this)">Sep</button>
+      <button class="f-btn" onclick="setMonth('10',this)">Oct</button>
+      <button class="f-btn" onclick="setMonth('11',this)">Nov</button>
+      <button class="f-btn" onclick="setMonth('12',this)">Dec</button>
+    </div>
+  </div>
+  <div class="date-filter-group">
+    <span class="tg-label">Compare</span>
+    <div class="btn-row">
+      <button class="f-btn" onclick="setCompare('ly_cy',this)">LY vs CY</button>
+      <button class="f-btn" onclick="setCompare('ytd',this)">YTD</button>
+    </div>
+  </div>
+  <button class="btn-ghost small" onclick="clearDateFilters()">Clear</button>
 </div>
 
 {% if not selected_period %}
@@ -146,12 +365,15 @@ function fmt(n) {
 }
 
 if (ALL_PROJECTS.length) {
-  renderKPIs();
-  renderDesignerBars();
+  tState.filtered = ALL_PROJECTS;
+  renderKPIsFromData(ALL_PROJECTS);
+  renderDesignerBarsFromData(ALL_PROJECTS);
   renderLegend();
-  buildChart('profit');
+  buildChartFromData('profit', ALL_PROJECTS);
+  currentChartData = ALL_PROJECTS;
   renderTable();
   buildDesFilterBtns();
+  buildYearBtns();
 }
 
 function renderKPIs() {
@@ -265,7 +487,8 @@ function buildDesFilterBtns() {
 }
 
 function renderTable() {
-  var rows = ALL_PROJECTS.filter(function(p) {
+  var source = (tState.filtered && tState.filtered !== ALL_PROJECTS) ? tState.filtered : ALL_PROJECTS;
+  var rows = source.filter(function(p) {
     if (tState.des !== 'All' && p.designer !== tState.des) return false;
     if (tState.margin === 'high' && p.margin <= 50)  return false;
     if (tState.margin === 'mid'  && (p.margin < 30 || p.margin > 50)) return false;
@@ -282,7 +505,7 @@ function renderTable() {
     return typeof av === 'string' ? tState.dir*av.localeCompare(bv) : tState.dir*(av-bv);
   });
   document.getElementById('resultCount').textContent =
-    'Showing ' + rows.length + ' of ' + ALL_PROJECTS.length + ' projects';
+    'Showing ' + rows.length + ' of ' + source.length + ' projects';
   var body = document.getElementById('tableBody');
   if (!rows.length) {
     body.innerHTML = '<tr><td colspan="6" class="tbl-empty">No projects match the current filters.</td></tr>';
@@ -327,5 +550,190 @@ function setSort(key,btn) {
   if(el) el.textContent = tState.dir===-1?'↓':'↑';
   renderTable();
 }
+
+// ── DATE FILTERING ──────────────────────────────────────────────
+var dState = { year: 'all', month: 'all', compare: null };
+
+function getMonthlyProjects(year, month) {
+  // Returns a projected version of ALL_PROJECTS filtered/aggregated by date
+  if (year === 'all' && month === 'all') return ALL_PROJECTS;
+
+  return ALL_PROJECTS.map(function(p) {
+    var md = p.monthly_data || {};
+    if (!Object.keys(md).length) {
+      // No monthly data — include if no date filter, exclude otherwise
+      return null;
+    }
+    var keys = Object.keys(md).filter(function(k) {
+      var parts = k.split('-');
+      var ky = parts[0]; var km = parts[1];
+      if (year !== 'all' && ky !== year) return false;
+      if (month !== 'all' && km !== month) return false;
+      return true;
+    });
+    if (!keys.length) return null;
+    var rev = 0, prof = 0, tb = 0;
+    keys.forEach(function(k) {
+      rev  += md[k].revenue      || 0;
+      prof += md[k].profit       || 0;
+      tb   += md[k].time_billing || 0;
+    });
+    var margin = rev > 0 ? Math.round(prof / rev * 1000) / 10 : 0;
+    return Object.assign({}, p, { revenue: rev, profit: prof, time_billing: tb, margin: margin });
+  }).filter(Boolean);
+}
+
+function buildYearBtns() {
+  var years = new Set();
+  ALL_PROJECTS.forEach(function(p) {
+    Object.keys(p.monthly_data || {}).forEach(function(k) { years.add(k.split('-')[0]); });
+  });
+  if (!years.size) return;
+  var row = document.getElementById('yearRow');
+  var html = '<button class="f-btn on" onclick="setYear('all',this)">All</button>';
+  Array.from(years).sort().forEach(function(y) {
+    html += '<button class="f-btn" onclick="setYear('' + y + '',this)">' + y + '</button>';
+  });
+  row.innerHTML = html;
+  document.getElementById('dateFilterBar').style.display = 'flex';
+}
+
+function setYear(val, btn) {
+  dState.year = val; dState.compare = null;
+  activateBtn(btn, '#yearRow', '#1c1a16');
+  refreshAll();
+}
+function setMonth(val, btn) {
+  dState.month = val; dState.compare = null;
+  activateBtn(btn, '#monthRow', '#1c1a16');
+  refreshAll();
+}
+function setCompare(mode, btn) {
+  dState.compare = mode; dState.month = 'all';
+  activateBtn(btn, '#compareRow', '#1c1a16');
+  if (mode === 'ly_cy') renderLyCy();
+  else if (mode === 'ytd') { dState.year = 'all'; refreshAll(); }
+}
+function clearDateFilters() {
+  dState = { year: 'all', month: 'all', compare: null };
+  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn').forEach(function(b) {
+    b.classList.remove('on'); b.style.cssText = '';
+  });
+  document.querySelector('#yearRow .f-btn').classList.add('on');
+  document.querySelector('#monthRow .f-btn').classList.add('on');
+  refreshAll();
+}
+
+function refreshAll() {
+  var filtered = getMonthlyProjects(dState.year, dState.month);
+  renderKPIsFromData(filtered);
+  renderDesignerBarsFromData(filtered);
+  renderLegend();
+  buildChartFromData('profit', filtered);
+  tState.filtered = filtered;
+  renderTable();
+}
+
+// Extend renderKPIs to accept data param
+function renderKPIsFromData(data) {
+  var totalRev    = data.reduce(function(s,p){return s+p.revenue;},0);
+  var totalProfit = data.reduce(function(s,p){return s+p.profit;},0);
+  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100).toFixed(1) : 0;
+  var totalTB     = data.reduce(function(s,p){return s+p.time_billing;},0);
+  var label = dState.year !== 'all' ? dState.year + (dState.month !== 'all' ? '-' + dState.month : '') : 'All periods';
+  document.getElementById('kpiGrid').innerHTML =
+    kpi('Total Revenue',  fmt(totalRev),    label) +
+    kpi('Total Profit',   fmt(totalProfit), label, true) +
+    kpi('Overall Margin', totalMargin + '%','Blended profit rate') +
+    kpi('Time Billing',   fmt(totalTB),     label);
+}
+
+function renderDesignerBarsFromData(data) {
+  var desMap = {};
+  data.forEach(function(p) {
+    if (p.designer === 'Unassigned') return;
+    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label,color:p.color_hex,revenue:0,profit:0,margin:0};
+    desMap[p.designer].revenue += p.revenue;
+    desMap[p.designer].profit  += p.profit;
+  });
+  Object.values(desMap).forEach(function(d) {
+    d.margin = d.revenue > 0 ? Math.round(d.profit/d.revenue*1000)/10 : 0;
+  });
+  var byRev = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
+  var maxRev = byRev.length ? byRev[0].revenue : 1;
+  document.getElementById('revBars').innerHTML = byRev.map(function(d) {
+    var pct = (d.revenue/maxRev*100).toFixed(0);
+    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+d.color+';"></div></div>' +
+      '<span class="des-num">'+fmt(d.revenue)+'</span></div>';
+  }).join('');
+  var byMar = Object.values(desMap).sort(function(a,b){return b.margin-a.margin;});
+  var maxMar = byMar.length ? byMar[0].margin : 1;
+  document.getElementById('marginBars').innerHTML = byMar.map(function(d) {
+    var pct = (d.margin/maxMar*100).toFixed(0);
+    return '<div class="des-row"><span class="des-name">'+d.label+'</span>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;opacity:.8;background:'+d.color+';"></div></div>' +
+      '<span class="des-pct" style="color:'+d.color+';">'+d.margin+'%</span></div>';
+  }).join('');
+}
+
+function buildChartFromData(mode, data) {
+  var desMap = {};
+  data.forEach(function(p) {
+    if (p.designer === 'Unassigned') return;
+    if (!desMap[p.designer]) desMap[p.designer] = {label:p.designer_label,color:p.color_hex,revenue:0,profit:0,time_billing:0,margin:0,_rev:0,_prof:0};
+    desMap[p.designer].revenue       += p.revenue;
+    desMap[p.designer].profit        += p.profit;
+    desMap[p.designer].time_billing  += p.time_billing;
+    desMap[p.designer]._rev          += p.revenue;
+    desMap[p.designer]._prof         += p.profit;
+  });
+  Object.values(desMap).forEach(function(d) {
+    d.margin = d._rev > 0 ? Math.round(d._prof/d._rev*1000)/10 : 0;
+  });
+  var summary = Object.values(desMap).sort(function(a,b){return b.revenue-a.revenue;});
+  if (!summary.length) return;
+
+  if (chart) { chart.destroy(); chart = null; }
+  var wrap = document.getElementById('mainChart').parentNode;
+  wrap.innerHTML = '<canvas id="mainChart"></canvas>';
+  var ctx = document.getElementById('mainChart').getContext('2d');
+  var labels = summary.map(function(d){return d.label;});
+  var vals   = summary.map(function(d){
+    return mode==='profit'?d.profit:mode==='revenue'?d.revenue:mode==='margin'?d.margin:d.time_billing;
+  });
+  var fmtFn = mode==='margin'?function(v){return v.toFixed(1)+'%';}:function(v){return fmt(v);};
+  chart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:labels, datasets:[{
+      data:vals,
+      backgroundColor:summary.map(function(d){return d.color+'cc';}),
+      borderColor:summary.map(function(d){return d.color;}),
+      borderWidth:1,borderRadius:2,borderSkipped:'bottom'
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+fmtFn(c.raw);}},
+        backgroundColor:'rgba(28,26,22,0.92)',titleColor:'#a09890',bodyColor:'#f7f4ee',padding:12,cornerRadius:2}},
+      scales:{
+        x:{grid:{display:false},border:{display:false},ticks:{color:'#a09890',font:{size:11}}},
+        y:{grid:{color:'rgba(28,26,22,0.04)'},border:{display:false},ticks:{color:'#a09890',font:{size:11},callback:function(v){return fmtFn(v);}}}
+      }
+    }
+  });
+  currentChartMode = mode;
+  currentChartData = data;
+}
+
+var currentChartMode = 'profit';
+var currentChartData = null;
+
+function switchChart(mode, btn) {
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  currentChartMode = mode;
+  buildChartFromData(mode, currentChartData || ALL_PROJECTS);
+}
+
 </script>
 {% endblock %}

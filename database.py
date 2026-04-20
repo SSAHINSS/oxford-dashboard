@@ -88,6 +88,9 @@ class Project(Base):
     time_billing = Column(Float, default=0)
     margin       = Column(Float, default=0)
     raw_row      = Column(JSONB, nullable=True)   # full source row preserved
+    monthly_data = Column(JSONB, nullable=True)   # {YYYY-MM: {revenue, profit, time_billing}}
+    date_min     = Column(String, nullable=True)  # earliest invoice date YYYY-MM-DD
+    date_max     = Column(String, nullable=True)  # latest invoice date YYYY-MM-DD
 
     period = relationship("Period", back_populates="projects")
     client = relationship("Client", back_populates="projects")
@@ -95,3 +98,22 @@ class Project(Base):
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    # Add new columns if they don't exist (safe migration)
+    try:
+        with engine.connect() as conn:
+            for col, typedef in [
+                ('monthly_data', 'JSONB'),
+                ('date_min',     'VARCHAR'),
+                ('date_max',     'VARCHAR'),
+            ]:
+                try:
+                    conn.execute(
+                        __import__('sqlalchemy').text(
+                            f"ALTER TABLE projects ADD COLUMN IF NOT EXISTS {col} {typedef}"
+                        )
+                    )
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+    except Exception as e:
+        print(f"Migration note: {e}")

@@ -179,6 +179,9 @@ def dashboard(
                 "profit":         round(float(p.profit or 0), 2),
                 "time_billing":   round(float(p.time_billing or 0), 2),
                 "margin":         round(float(p.margin or 0), 1),
+                "monthly_data":   p.monthly_data or {},
+                "date_min":       p.date_min,
+                "date_max":       p.date_max,
             })
 
         des_map: dict = {}
@@ -434,6 +437,9 @@ async def upload_confirm(request: Request, current_user: User = Depends(require_
             profit=float(a.get("profit") or 0),
             time_billing=float(a.get("time_billing") or 0),
             margin=float(a.get("margin") or 0),
+            monthly_data=a.get("monthly_data") or {},
+            date_min=a.get("date_min"),
+            date_max=a.get("date_max"),
         )
         db.add(project)
 

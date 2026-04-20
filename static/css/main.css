@@ -335,3 +335,18 @@ body {
 .assign-panel { display:none; background:white; border:1px solid var(--border); border-radius:2px; padding:20px 24px; margin-bottom:24px; box-shadow:var(--shadow-sm); }
 .assign-panel.open { display:block; }
 .assign-panel-form { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+
+/* ── DATE FILTERS ── */
+.date-filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-sm);
+}
+.date-filter-group { display: flex; flex-direction: column; gap: 6px; }
