@@ -9,11 +9,11 @@ from auth import hash_password
 from excel import norm_name
 
 INITIAL_DESIGNERS = [
-    {"name": "Kasey/Asije",           "label": "Kasey / Asije",         "color_hex": "#7b5ea7"},
-    {"name": "Jacki",                  "label": "Jacki",                  "color_hex": "#2d6a9f"},
-    {"name": "Lori/Katie",             "label": "Lori / Katie",           "color_hex": "#b8963a"},
-    {"name": "Danielle/Joelle/Wes",   "label": "Danielle / Joelle / Wes","color_hex": "#c96a3a"},
-    {"name": "Joelle",                 "label": "Joelle",                 "color_hex": "#3a8c72"},
+    {"name": "Kasey/Asije",           "label": "Kasey / Asije",         "color_hex": "#444735"},
+    {"name": "Jacki",                  "label": "Jacki",                  "color_hex": "#353738"},
+    {"name": "Lori/Katie",             "label": "Lori / Katie",           "color_hex": "#b89653"},
+    {"name": "Danielle/Joelle/Wes",   "label": "Danielle / Joelle / Wes","color_hex": "#6b6f57"},
+    {"name": "Joelle",                 "label": "Joelle",                 "color_hex": "#8a7444"},
 ]
 
 # Historical client → designer assignments

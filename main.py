@@ -214,6 +214,20 @@ def dashboard(
     })
 
 
+@app.post("/designers/retune-colors")
+def retune_designer_colors(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """One-time: retune existing designer colors to Oxford brand palette."""
+    oxford_palette = ['#444735', '#353738', '#b89653', '#6b6f57', '#8a7444', '#8a8e73', '#a88f4c', '#5a5e48']
+    designers = db.query(Designer).order_by(Designer.id).all()
+    for i, des in enumerate(designers):
+        des.color_hex = oxford_palette[i % len(oxford_palette)]
+    db.commit()
+    return RedirectResponse(url="/designers", status_code=302)
+
+
 @app.post("/periods/{period_id}/delete")
 def delete_period(
     period_id:    int,

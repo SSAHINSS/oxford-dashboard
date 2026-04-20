@@ -217,10 +217,111 @@ function fmt(n) {
   return '$' + Math.round(n);
 }
 
-function kpi(label, value, sub, accent) {
-  return '<div class="kpi-card"><p class="kpi-label">'+label+'</p>' +
-    '<p class="kpi-value'+(accent?' accent':'')+'">'+value+'</p>' +
-    '<p class="kpi-sub">'+sub+'</p></div>';
+function kpi(label, value, sub, accent, sparkline, delta) {
+  var sparkHtml = sparkline || '';
+  var deltaHtml = delta || '';
+  return '<div class="kpi-card">' +
+    '<p class="kpi-label">' + label + '</p>' +
+    '<p class="kpi-value' + (accent ? ' accent' : '') + '">' + value + '</p>' +
+    '<p class="kpi-period">' + sub + '</p>' +
+    sparkHtml +
+    deltaHtml +
+  '</div>';
+}
+
+// Build SVG sparkline from an array of 12 monthly values
+function sparkline(values, color) {
+  if (!values || !values.length) return '';
+  var max = Math.max.apply(null, values);
+  var min = Math.min.apply(null, values);
+  var range = max - min || 1;
+  var w = 240, h = 32, pad = 2;
+  var stepX = (w - pad*2) / (values.length - 1);
+  var points = values.map(function(v, i) {
+    var x = pad + i * stepX;
+    var y = h - pad - ((v - min) / range) * (h - pad*2);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  // Area fill path
+  var firstX = pad;
+  var lastX  = pad + (values.length - 1) * stepX;
+  var areaPath = 'M ' + firstX + ',' + h + ' L ' + points.replace(/ /g, ' L ') + ' L ' + lastX + ',' + h + ' Z';
+  return '<svg class="kpi-sparkline" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="' + areaPath + '" fill="' + color + '" opacity="0.08"/>' +
+    '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+  '</svg>';
+}
+
+// Get 12 monthly values for the currently filtered year and metric
+function getMonthlyValues(year, metric) {
+  var vals = new Array(12).fill(0);
+  ALL_PROJECTS.forEach(function(p) {
+    var md = p.monthly_data || {};
+    Object.keys(md).forEach(function(k) {
+      var parts = k.split('-');
+      if (year !== 'all' && parts[0] !== year) return;
+      var m = parseInt(parts[1]) - 1;
+      if (m < 0 || m > 11) return;
+      if (metric === 'revenue')      vals[m] += md[k].revenue || 0;
+      else if (metric === 'profit')  vals[m] += md[k].profit || 0;
+      else if (metric === 'time_billing') vals[m] += md[k].time_billing || 0;
+      else if (metric === 'margin') {
+        // margin is special - compute after revenue/profit sums
+      }
+    });
+  });
+  if (metric === 'margin') {
+    // Recompute: margin per month = profit / revenue
+    var rev = new Array(12).fill(0), prof = new Array(12).fill(0);
+    ALL_PROJECTS.forEach(function(p) {
+      var md = p.monthly_data || {};
+      Object.keys(md).forEach(function(k) {
+        var parts = k.split('-');
+        if (year !== 'all' && parts[0] !== year) return;
+        var m = parseInt(parts[1]) - 1;
+        rev[m] += md[k].revenue || 0;
+        prof[m] += md[k].profit || 0;
+      });
+    });
+    for (var i = 0; i < 12; i++) vals[i] = rev[i] > 0 ? (prof[i]/rev[i])*100 : 0;
+  }
+  return vals;
+}
+
+// Compute total across all years for a metric (for comparison delta)
+function getTotalForYear(year, metric) {
+  var rev = 0, prof = 0, tb = 0;
+  ALL_PROJECTS.forEach(function(p) {
+    var md = p.monthly_data || {};
+    Object.keys(md).forEach(function(k) {
+      var parts = k.split('-');
+      if (year !== 'all' && parts[0] !== year) return;
+      rev  += md[k].revenue || 0;
+      prof += md[k].profit || 0;
+      tb   += md[k].time_billing || 0;
+    });
+  });
+  if (metric === 'revenue')      return rev;
+  if (metric === 'profit')       return prof;
+  if (metric === 'time_billing') return tb;
+  if (metric === 'margin')       return rev > 0 ? (prof/rev)*100 : 0;
+  return 0;
+}
+
+function deltaIndicator(current, previous, isPercent) {
+  if (!previous) return '';
+  var diff, pct;
+  if (isPercent) {
+    diff = current - previous;
+    var arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '—');
+    var cls = diff > 0 ? 'delta-up' : (diff < 0 ? 'delta-down' : 'delta-neutral');
+    return '<div class="kpi-trend"><span class="kpi-delta ' + cls + '">' + arrow + ' ' + Math.abs(diff).toFixed(1) + 'pts</span><span class="kpi-trend-label">vs prior year</span></div>';
+  } else {
+    pct = ((current - previous) / Math.abs(previous)) * 100;
+    var arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '—');
+    var cls = pct > 0 ? 'delta-up' : (pct < 0 ? 'delta-down' : 'delta-neutral');
+    return '<div class="kpi-trend"><span class="kpi-delta ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(0) + '%</span><span class="kpi-trend-label">vs prior year</span></div>';
+  }
 }
 
 // ── Date filtering ──
@@ -255,18 +356,41 @@ function renderKPIs(data) {
   }
   var totalRev    = data.reduce(function(s,p){return s+p.revenue;},0);
   var totalProfit = data.reduce(function(s,p){return s+p.profit;},0);
-  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100).toFixed(1) : '0.0';
+  var totalMargin = totalRev > 0 ? (totalProfit/totalRev*100) : 0;
   var totalTB     = data.reduce(function(s,p){return s+p.time_billing;},0);
+
+  // Determine current year for sparkline + previous year for delta
+  var currentYear = dState.year !== 'all' ? dState.year : (getAvailableYears().slice(-1)[0] || 'all');
+  var priorYear   = null;
+  var years = getAvailableYears();
+  var idx = years.indexOf(currentYear);
+  if (idx > 0) priorYear = years[idx - 1];
+
   var label = 'All periods';
   if (dState.year !== 'all' || dState.month !== 'all') {
     var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     label = (dState.month !== 'all' ? monthNames[parseInt(dState.month)] + ' ' : '') + (dState.year !== 'all' ? dState.year : '');
   }
+
+  var oliveColor = '#444735';
+
+  // Sparklines for each metric based on currentYear
+  var sparkRev    = sparkline(getMonthlyValues(currentYear, 'revenue'),      oliveColor);
+  var sparkProfit = sparkline(getMonthlyValues(currentYear, 'profit'),       oliveColor);
+  var sparkMargin = sparkline(getMonthlyValues(currentYear, 'margin'),       oliveColor);
+  var sparkTB     = sparkline(getMonthlyValues(currentYear, 'time_billing'), oliveColor);
+
+  // Deltas vs prior year (only when a year is filtered or auto-selected)
+  var deltaRev    = priorYear ? deltaIndicator(totalRev,    getTotalForYear(priorYear, 'revenue'),      false) : '';
+  var deltaProfit = priorYear ? deltaIndicator(totalProfit, getTotalForYear(priorYear, 'profit'),       false) : '';
+  var deltaMargin = priorYear ? deltaIndicator(totalMargin, getTotalForYear(priorYear, 'margin'),       true)  : '';
+  var deltaTB     = priorYear ? deltaIndicator(totalTB,     getTotalForYear(priorYear, 'time_billing'), false) : '';
+
   document.getElementById('kpiGrid').innerHTML =
-    kpi('Total Revenue',  fmt(totalRev),    label) +
-    kpi('Total Profit',   fmt(totalProfit), label, true) +
-    kpi('Overall Margin', totalMargin+'%',  'Blended profit rate') +
-    kpi('Time Billing',   fmt(totalTB),     label);
+    kpi('Total Revenue',  fmt(totalRev),    label, false, sparkRev,    deltaRev) +
+    kpi('Total Profit',   fmt(totalProfit), label, true,  sparkProfit, deltaProfit) +
+    kpi('Overall Margin', totalMargin.toFixed(1)+'%', label, false, sparkMargin, deltaMargin) +
+    kpi('Time Billing',   fmt(totalTB),     label, false, sparkTB,     deltaTB);
 }
 
 function renderKPIsCompare() {
@@ -445,14 +569,14 @@ function buildChart(mode, data) {
         legend:{display:false},
         tooltip:{
           callbacks:{label:function(c){return ' '+fmtFn(c.raw);}},
-          backgroundColor:'rgba(28,26,22,0.92)', titleColor:'#a09890', bodyColor:'#f7f4ee',
+          backgroundColor:'rgba(53,55,56,0.94)', titleColor:'#a8a8a9', bodyColor:'#fcf8f3',
           padding:12, cornerRadius:2
         }
       },
       scales:{
-        x:{grid:{display:false},border:{display:false},ticks:{color:'#a09890',font:{size:11}}},
-        y:{grid:{color:'rgba(28,26,22,0.04)'},border:{display:false},
-           ticks:{color:'#a09890',font:{size:11},callback:function(v){return fmtFn(v);}}}
+        x:{grid:{display:false},border:{display:false},ticks:{color:'#a8a8a9',font:{size:11}}},
+        y:{grid:{color:'rgba(68,71,53,0.06)'},border:{display:false},
+           ticks:{color:'#a8a8a9',font:{size:11},callback:function(v){return fmtFn(v);}}}
       }
     }
   });
@@ -548,14 +672,14 @@ function buildYearBtns() {
 function setYear(val, btn) {
   dState.year = val;
   document.querySelectorAll('#yearRow .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
-  btn.classList.add('on'); btn.style.background='#1c1a16'; btn.style.borderColor='#1c1a16'; btn.style.color='white';
+  btn.classList.add('on'); btn.style.background='#444735'; btn.style.borderColor='#444735'; btn.style.color='#fcf8f3';
   refreshAll();
 }
 
 function setMonth(val, btn) {
   dState.month = val;
   document.querySelectorAll('#monthRow .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
-  btn.classList.add('on'); btn.style.background='#1c1a16'; btn.style.borderColor='#1c1a16'; btn.style.color='white';
+  btn.classList.add('on'); btn.style.background='#444735'; btn.style.borderColor='#444735'; btn.style.color='#fcf8f3';
   refreshAll();
 }
 
@@ -583,8 +707,8 @@ function activateBtn(btn, rowId, color) {
   document.querySelectorAll(rowId + ' .f-btn').forEach(function(b){b.classList.remove('on');b.style.cssText='';});
   btn.classList.add('on'); btn.style.background=color; btn.style.borderColor=color; btn.style.color='white';
 }
-function setDesFilter(val, btn) { tState.des=val; activateBtn(btn,'#desFiltRow','#1c1a16'); renderTable(); }
-function setFilt(type, val, btn, rowId) { tState[type]=val; activateBtn(btn,rowId,'#1c1a16'); renderTable(); }
+function setDesFilter(val, btn) { tState.des=val; activateBtn(btn,'#desFiltRow','#444735'); renderTable(); }
+function setFilt(type, val, btn, rowId) { tState[type]=val; activateBtn(btn,rowId,'#444735'); renderTable(); }
 function doSearch(v) { tState.search=v.toLowerCase(); renderTable(); }
 function setSort(key, btn) {
   tState.dir = tState.sort===key ? tState.dir*-1 : (key==='client'?1:-1);
@@ -604,7 +728,7 @@ var compareState = {
   metric: 'profit'
 };
 var compareChart = null;
-var PERIOD_COLORS = ['#1c1a16', '#7b5ea7', '#b8963a', '#2d6a9f', '#c96a3a'];
+var PERIOD_COLORS = ['#444735', '#6b5540', '#8a8e73', '#353738', '#9e7e52'];
 
 function getAvailableYears() {
   var years = {};
@@ -887,11 +1011,11 @@ function commonCompareOptions(fmtFn, stacked) {
     plugins: {
       legend: {
         display: true, position: 'bottom',
-        labels: { color: '#5a564e', font: { size: 11 }, boxWidth: 12, padding: 12 }
+        labels: { color: '#6b6c6d', font: { size: 11 }, boxWidth: 12, padding: 12 }
       },
       tooltip: {
         callbacks: { label: function(c) { return c.dataset.label + ': ' + fmtFn(c.raw); } },
-        backgroundColor: 'rgba(28,26,22,0.92)', titleColor: '#a09890', bodyColor: '#f7f4ee',
+        backgroundColor: 'rgba(53,55,56,0.94)', titleColor: '#a8a8a9', bodyColor: '#f7f4ee',
         padding: 12, cornerRadius: 2
       }
     },
@@ -899,12 +1023,12 @@ function commonCompareOptions(fmtFn, stacked) {
       x: {
         stacked: stacked || false,
         grid: { display: false }, border: { display: false },
-        ticks: { color: '#a09890', font: { size: 11 } }
+        ticks: { color: '#a8a8a9', font: { size: 11 } }
       },
       y: {
         stacked: stacked || false,
-        grid: { color: 'rgba(28,26,22,0.04)' }, border: { display: false },
-        ticks: { color: '#a09890', font: { size: 11 }, callback: function(v){ return fmtFn(v); } }
+        grid: { color: 'rgba(68,71,53,0.06)' }, border: { display: false },
+        ticks: { color: '#a8a8a9', font: { size: 11 }, callback: function(v){ return fmtFn(v); } }
       }
     }
   };
@@ -1006,8 +1130,8 @@ function renderCompareLineChart(ctx) {
 }
 
 function drawNoData(ctx) {
-  ctx.font = '14px "DM Sans", sans-serif';
-  ctx.fillStyle = '#a09890';
+  ctx.font = '14px Inter, sans-serif';
+  ctx.fillStyle = '#a8a8a9';
   ctx.textAlign = 'center';
   ctx.fillText('No data for selected periods', ctx.canvas.width / 2, ctx.canvas.height / 2);
 }
