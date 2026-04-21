@@ -477,7 +477,6 @@ function renderDesignerBars(data) {
   var map = {};
   for (var i = 0; i < data.length; i++) {
     var p = data[i];
-    if (p.designer === 'Unassigned') continue;
     if (!map[p.designer]) map[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0};
     map[p.designer].revenue += p.revenue;
     map[p.designer].profit  += p.profit;
@@ -488,7 +487,12 @@ function renderDesignerBars(data) {
     list.push(map[k]);
   }
 
-  var byRev = list.slice().sort(function(a,b){return b.revenue-a.revenue;});
+  // Sort with Unassigned pinned to last
+  var byRev = list.slice().sort(function(a,b){
+    if (a.label === 'Unassigned') return 1;
+    if (b.label === 'Unassigned') return -1;
+    return b.revenue - a.revenue;
+  });
   var maxRev = byRev.length ? byRev[0].revenue : 1;
   document.getElementById('revBars').innerHTML = byRev.map(function(d) {
     var pct = (d.revenue/maxRev*100).toFixed(0);
@@ -497,7 +501,11 @@ function renderDesignerBars(data) {
       '<span class="des-num">'+fmt(d.revenue)+'</span></div>';
   }).join('');
 
-  var byMar = list.slice().sort(function(a,b){return b.margin-a.margin;});
+  var byMar = list.slice().sort(function(a,b){
+    if (a.label === 'Unassigned') return 1;
+    if (b.label === 'Unassigned') return -1;
+    return b.margin - a.margin;
+  });
   var maxMar = byMar.length ? Math.max(1, byMar[0].margin) : 1;
   document.getElementById('marginBars').innerHTML = byMar.map(function(d) {
     var pct = Math.max(0, Math.min(100, d.margin/maxMar*100)).toFixed(0);
@@ -515,7 +523,7 @@ function renderLegend(data) {
   var map = {};
   for (var i = 0; i < data.length; i++) {
     var p = data[i];
-    if (p.designer === 'Unassigned' || map[p.designer]) continue;
+    if (map[p.designer]) continue;
     map[p.designer] = {label:p.designer_label, color:p.color_hex};
   }
   var html = '';
@@ -530,7 +538,6 @@ function buildChart(mode, data) {
   var map = {};
   for (var i = 0; i < data.length; i++) {
     var p = data[i];
-    if (p.designer === 'Unassigned') continue;
     if (!map[p.designer]) map[p.designer] = {label:p.designer_label, color:p.color_hex, revenue:0, profit:0, time_billing:0};
     map[p.designer].revenue      += p.revenue;
     map[p.designer].profit       += p.profit;
@@ -541,7 +548,11 @@ function buildChart(mode, data) {
     map[k].margin = map[k].revenue > 0 ? Math.round(map[k].profit/map[k].revenue*1000)/10 : 0;
     list.push(map[k]);
   }
-  list.sort(function(a,b){return b.revenue-a.revenue;});
+  list.sort(function(a,b){
+    if (a.label === 'Unassigned') return 1;
+    if (b.label === 'Unassigned') return -1;
+    return b.revenue - a.revenue;
+  });
 
   if (chart) { chart.destroy(); chart = null; }
   var wrap = document.getElementById('mainChart').parentNode;
@@ -598,7 +609,7 @@ function buildDesFilterBtns(data) {
   var seen = {};
   for (var i = 0; i < data.length; i++) {
     var p = data[i];
-    if (p.designer === 'Unassigned' || seen[p.designer]) continue;
+    if (seen[p.designer]) continue;
     seen[p.designer] = true;
     var btn = document.createElement('button');
     btn.className = 'f-btn';
@@ -734,12 +745,16 @@ function buildTeamBtns() {
   var list = [];
   for (var i = 0; i < ALL_PROJECTS.length; i++) {
     var p = ALL_PROJECTS[i];
-    if (p.designer === 'Unassigned' || seen[p.designer]) continue;
+    if (seen[p.designer]) continue;
     seen[p.designer] = true;
     list.push({ name: p.designer, label: p.designer_label, color: p.color_hex });
   }
   if (!list.length) return;
-  list.sort(function(a,b){ return a.label.localeCompare(b.label); });
+  list.sort(function(a,b){
+    if (a.label === 'Unassigned') return 1;
+    if (b.label === 'Unassigned') return -1;
+    return a.label.localeCompare(b.label);
+  });
 
   var html = '<button class="f-btn on" onclick="clearDesigners(this)">All (Company)</button>';
   for (var i = 0; i < list.length; i++) {
@@ -912,7 +927,6 @@ function aggregatePeriodByDesigner(period) {
   var desMap = {};
   for (var i = 0; i < ALL_PROJECTS.length; i++) {
     var p = ALL_PROJECTS[i];
-    if (p.designer === 'Unassigned') continue;
     if (hasDes && dState.designers.indexOf(p.designer) < 0) continue;
     var md = p.monthly_data || {};
     var keys = Object.keys(md);
@@ -1035,8 +1049,7 @@ function renderCompareByPeriod(ctx) {
     var rev = 0, prof = 0, tb = 0;
     for (var i = 0; i < ALL_PROJECTS.length; i++) {
       var p = ALL_PROJECTS[i];
-      if (p.designer === 'Unassigned') continue;
-      if (hasDes && dState.designers.indexOf(p.designer) < 0) continue;
+        if (hasDes && dState.designers.indexOf(p.designer) < 0) continue;
       var md = p.monthly_data || {};
       var keys = Object.keys(md);
       for (var j = 0; j < keys.length; j++) {

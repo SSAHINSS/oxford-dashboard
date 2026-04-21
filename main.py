@@ -174,7 +174,7 @@ def dashboard(
                 "client":         p.client.name,
                 "designer":       des.name      if des else "Unassigned",
                 "designer_label": des.label     if des else "Unassigned",
-                "color_hex":      des.color_hex if des else "#aaaaaa",
+                "color_hex":      des.color_hex if des else "#a09585",  # warm taupe — reads as neutral
                 "revenue":        round(float(p.revenue or 0), 2),
                 "profit":         round(float(p.profit or 0), 2),
                 "time_billing":   round(float(p.time_billing or 0), 2),

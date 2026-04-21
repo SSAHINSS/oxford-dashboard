@@ -848,14 +848,14 @@ body {
 .des-num {
   font-family: var(--sans);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   text-align: right;
   color: var(--ink-light);
   font-variant-numeric: tabular-nums;
 }
 .des-pct {
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   text-align: right;
   font-variant-numeric: tabular-nums;
