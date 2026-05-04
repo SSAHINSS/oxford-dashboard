@@ -222,7 +222,7 @@ function progressBar(actual, goal, accent, isPercent) {
     '<div class="' + bgClass + '" style="width:' + pct + '%;background:' + color + ';"></div>' +
   '</div>' +
   '<p class="progress-text">Goal ' + goalStr + ' &middot; ' + variance +
-    (pct >= 100 ? ' <span class="progress-badge">✓ Goal reached</span>' : '') +
+    (pct >= 100 && !isPercent ? ' <span class="progress-badge">✓ Goal reached</span>' : '') +
   '</p>';
 }
 
