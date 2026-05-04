@@ -42,14 +42,20 @@
 <!-- MOTIVATIONAL HERO CARDS -->
 <div class="kpi-grid hero" id="kpiGrid"></div>
 
-<!-- COMPANY MONTHLY TREND -->
+<!-- COMPANY THIS-YEAR CHART -->
 <section style="margin-bottom: 56px;">
   <div class="section-header"><span class="section-label">This Year</span><div class="section-line"></div></div>
   <div class="chart-wrap">
-    <div class="chart-tabs">
-      <button class="tab-btn active" data-mode="profit"  onclick="switchTrend('profit',this)">Profit</button>
-      <button class="tab-btn"        data-mode="revenue" onclick="switchTrend('revenue',this)">Revenue</button>
-      <button class="tab-btn"        data-mode="margin"  onclick="switchTrend('margin',this)">Margin %</button>
+    <div class="chart-toolbar">
+      <div class="chart-tabs">
+        <button class="tab-btn active" data-mode="profit"  onclick="switchTrend('profit',this)">Profit</button>
+        <button class="tab-btn"        data-mode="revenue" onclick="switchTrend('revenue',this)">Revenue</button>
+        <button class="tab-btn"        data-mode="margin"  onclick="switchTrend('margin',this)">Margin %</button>
+      </div>
+      <div class="chart-tabs">
+        <button class="tab-btn"        data-period="monthly"   id="periodMonthly"   onclick="switchPeriod('monthly',this)">Monthly</button>
+        <button class="tab-btn active" data-period="quarterly" id="periodQuarterly" onclick="switchPeriod('quarterly',this)">Quarterly</button>
+      </div>
     </div>
     <div class="chart-canvas-wrap" style="height:340px;"><canvas id="trendChart"></canvas></div>
     <div class="legend-row" id="trendLegend" style="margin-top:18px;justify-content:center;"></div>
@@ -75,6 +81,7 @@ var ALL_PROJECTS = {{ projects | safe }};
 var dState = { year: 'all' };
 var trendChart = null, yoyChart = null;
 var currentTrendMode = 'profit';
+var currentPeriodMode = 'quarterly';  // monthly | quarterly
 
 // ─────────────────────────────────────────────────
 // UTILITIES
@@ -329,63 +336,91 @@ function renderKPIs() {
 }
 
 // ─────────────────────────────────────────────────
-// MONTHLY TREND CHART (current year vs goal year)
+// THIS-YEAR CHART (bar) — monthly or quarterly
 // ─────────────────────────────────────────────────
+function aggregateByYearQuarter(byYM) {
+  var byYQ = {};
+  Object.keys(byYM).forEach(function(k) {
+    var p = k.split('-');
+    var y = p[0], m = parseInt(p[1]);
+    var q = 'Q' + (Math.ceil(m / 3));
+    var key = y + '-' + q;
+    if (!byYQ[key]) byYQ[key] = { revenue:0, profit:0, time_billing:0 };
+    byYQ[key].revenue      += byYM[k].revenue      || 0;
+    byYQ[key].profit       += byYM[k].profit       || 0;
+    byYQ[key].time_billing += byYM[k].time_billing || 0;
+  });
+  return byYQ;
+}
+
 function buildTrendChart(mode) {
   if (trendChart) { trendChart.destroy(); trendChart = null; }
   var wrap = document.getElementById('trendChart').parentNode;
   wrap.innerHTML = '<canvas id="trendChart"></canvas>';
   var ctx = document.getElementById('trendChart').getContext('2d');
+
   var byYM = aggregateByYearMonth();
   var current = getCurrentYear();
   var goals = computeGoals();
   var goalYear = goals.revenueYear;
 
-  var monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  var labels, currentVals, goalVals;
 
-  function valuesForYear(y) {
-    return months.map(function(m) {
-      var k = y + '-' + m;
-      var d = byYM[k];
-      if (!d) return null;  // gap-out missing months
-      if (mode === 'margin') {
-        return d.revenue > 0 ? d.profit/d.revenue*100 : null;
-      }
-      return d[mode] || 0;
-    });
+  if (currentPeriodMode === 'quarterly') {
+    var byYQ = aggregateByYearQuarter(byYM);
+    labels = ['Q1','Q2','Q3','Q4'];
+    function quarterValuesForYear(y) {
+      return labels.map(function(q) {
+        var d = byYQ[y + '-' + q];
+        if (!d) return null;
+        if (mode === 'margin') return d.revenue > 0 ? d.profit/d.revenue*100 : null;
+        return d[mode] || 0;
+      });
+    }
+    currentVals = quarterValuesForYear(current);
+    goalVals    = goalYear ? quarterValuesForYear(goalYear) : null;
+  } else {
+    labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+    function monthValuesForYear(y) {
+      return months.map(function(m) {
+        var d = byYM[y + '-' + m];
+        if (!d) return null;
+        if (mode === 'margin') return d.revenue > 0 ? d.profit/d.revenue*100 : null;
+        return d[mode] || 0;
+      });
+    }
+    currentVals = monthValuesForYear(current);
+    goalVals    = goalYear ? monthValuesForYear(goalYear) : null;
   }
 
   var datasets = [{
     label: current,
-    data: valuesForYear(current),
+    data: currentVals,
+    backgroundColor: '#444735cc',
     borderColor: '#444735',
-    backgroundColor: 'rgba(68,71,53,0.10)',
-    borderWidth: 3,
-    tension: 0.25, fill: true,
-    pointRadius: 4, pointBackgroundColor: '#444735',
-    pointBorderColor: '#fff', pointBorderWidth: 1.5,
-    spanGaps: false
+    borderWidth: 1,
+    borderRadius: 2,
+    borderSkipped: 'bottom'
   }];
 
   if (goalYear) {
-    datasets.push({
+    datasets.unshift({  // unshift so goal bars sit behind current
       label: goalYear + ' (goal)',
-      data: valuesForYear(goalYear),
+      data: goalVals,
+      backgroundColor: 'rgba(184, 150, 83, 0.18)',
       borderColor: '#b89653',
-      backgroundColor: 'transparent',
-      borderWidth: 1.5,
-      borderDash: [4, 4],
-      tension: 0.25, fill: false,
-      pointRadius: 2, pointBackgroundColor: '#b89653',
-      spanGaps: true
+      borderWidth: 1,
+      borderDash: [4, 3],
+      borderRadius: 2,
+      borderSkipped: 'bottom'
     });
   }
 
   var fmtFn = mode === 'margin' ? function(v){return (v||0).toFixed(1)+'%';} : function(v){return fmt(v);};
   trendChart = new Chart(ctx, {
-    type: 'line',
-    data: { labels: monthLabels, datasets: datasets },
+    type: 'bar',
+    data: { labels: labels, datasets: datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
@@ -407,14 +442,22 @@ function buildTrendChart(mode) {
 
   // Custom legend
   var html = '<span class="leg-item"><span class="leg-dot" style="background:#444735;"></span>' + current + ' (current)</span>';
-  if (goalYear) html += '<span class="leg-item"><span class="leg-dot" style="background:#b89653;border:2px dashed #b89653;background:transparent;"></span>' + goalYear + ' (goal pace)</span>';
+  if (goalYear) html += '<span class="leg-item"><span class="leg-dot" style="background:rgba(184,150,83,0.4);border:1px dashed #b89653;"></span>' + goalYear + ' (goal pace)</span>';
   document.getElementById('trendLegend').innerHTML = html;
 }
 
 function switchTrend(mode, btn) {
-  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  // Only deactivate metric tabs (the ones with data-mode)
+  document.querySelectorAll('.tab-btn[data-mode]').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   buildTrendChart(mode);
+}
+
+function switchPeriod(period, btn) {
+  document.querySelectorAll('.tab-btn[data-period]').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  currentPeriodMode = period;
+  buildTrendChart(currentTrendMode);
 }
 
 // ─────────────────────────────────────────────────
