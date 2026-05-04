@@ -1484,14 +1484,10 @@ body {
    COMPANY VIEW — MOTIVATIONAL ELEMENTS
    ════════════════════════════════════════════════ */
 
-/* Three-column hero grid — width matches chart-wrap below */
-.company-topbar + .filter-drawer + .kpi-grid.hero,
-.company-topbar + .kpi-grid.hero {
-  grid-template-columns: repeat(3, 1fr);
+/* Three-column hero grid — overrides 4-col default */
+.kpi-grid.hero {
+  grid-template-columns: repeat(3, 1fr) !important;
   gap: 22px;
-  width: 100%;
-  margin-left: 0;
-  margin-right: 0;
 }
 @media (max-width: 1100px) { .kpi-grid.hero { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 720px)  { .kpi-grid.hero { grid-template-columns: 1fr; } }
@@ -1558,4 +1554,29 @@ body {
   text-transform: uppercase;
   margin-left: 6px;
   border-radius: 1px;
+}
+
+/* Variance pill in progress text */
+.variance {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.variance.pos { color: var(--pos); }
+.variance.neg { color: var(--neg); }
+
+/* Goal source line at bottom of motivational cards */
+.goal-source {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-xlight);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+  font-style: italic;
 }

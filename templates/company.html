@@ -187,16 +187,27 @@ function computeGoals() {
 // ─────────────────────────────────────────────────
 // PROGRESS METER
 // ─────────────────────────────────────────────────
-function progressBar(actual, goal, accent) {
+function progressBar(actual, goal, accent, isPercent) {
   if (!goal || goal === 0) return '';
   var pct = Math.min(100, Math.max(0, (actual / goal) * 100));
   var color = accent ? '#b89653' : '#444735';
   var bgClass = pct >= 100 ? 'progress-fill complete' : 'progress-fill';
+  // Variance: how far above/below goal
+  var variance;
+  if (isPercent) {
+    var diff = actual - goal;  // raw point difference for margin
+    var dir = diff >= 0 ? '▲' : '▼';
+    variance = '<span class="variance ' + (diff >= 0 ? 'pos' : 'neg') + '">' + dir + ' ' + Math.abs(diff).toFixed(1) + 'pts</span>';
+  } else {
+    var pctDiff = goal > 0 ? ((actual - goal) / goal * 100) : 0;
+    var dir = pctDiff >= 0 ? '▲' : '▼';
+    variance = '<span class="variance ' + (pctDiff >= 0 ? 'pos' : 'neg') + '">' + dir + ' ' + Math.abs(pctDiff).toFixed(0) + '%</span>';
+  }
+  var goalStr = isPercent ? goal.toFixed(1) + '%' : fmt(goal);
   return '<div class="progress-track">' +
     '<div class="' + bgClass + '" style="width:' + pct + '%;background:' + color + ';"></div>' +
   '</div>' +
-  '<p class="progress-text">' +
-    pct.toFixed(0) + '% of ' + (typeof goal === 'number' && goal > 1000 ? fmt(goal) : goal.toFixed(1) + '%') +
+  '<p class="progress-text">Goal ' + goalStr + ' &middot; ' + variance +
     (pct >= 100 ? ' <span class="progress-badge">✓ Goal reached</span>' : '') +
   '</p>';
 }
@@ -270,18 +281,13 @@ function renderKPIs() {
   var pacePct = goals.revenue ? (currentData.revenue / goals.revenue * 100) : null;
   var paceCard;
   if (goals.revenue) {
-    var paceLabel = pacePct >= 100 ? 'Goal Achieved!' :
-                    pacePct >= 75  ? 'On Track' :
-                    pacePct >= 50  ? 'Steady Progress' :
-                    'Building Momentum';
+    var paceLabel = pacePct >= 100 ? 'Above Target' : 'Below Target';
     paceCard = '<div class="kpi-card hero motivational">' +
       '<p class="kpi-label">' + current + ' REVENUE PACE</p>' +
       '<p class="kpi-value">' + fmt(currentData.revenue) + '</p>' +
       '<p class="kpi-context">' + paceLabel + '</p>' +
       progressBar(currentData.revenue, goals.revenue, false) +
-      '<div class="kpi-trend flat" style="border-top-color:transparent;padding-top:6px;">' +
-        '<span class="trend-meta">Goal: ' + fmt(goals.revenue) + ' (' + goals.revenueYear + ' best)</span>' +
-      '</div>' +
+      '<p class="goal-source">Best year: ' + goals.revenueYear + '</p>' +
     '</div>';
   } else {
     paceCard = '<div class="kpi-card hero"><p class="kpi-label">' + current + ' Revenue</p><p class="kpi-value">' + fmt(currentData.revenue) + '</p><p class="kpi-context">No prior year for goal</p></div>';
@@ -299,10 +305,8 @@ function renderKPIs() {
       '<p class="kpi-label">' + current + ' MARGIN</p>' +
       '<p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p>' +
       '<p class="kpi-context">' + marginLabel + '</p>' +
-      progressBar(currentData.margin, goals.margin, true) +
-      '<div class="kpi-trend flat" style="border-top-color:transparent;padding-top:6px;">' +
-        '<span class="trend-meta">Target: ' + goals.margin.toFixed(1) + '% (' + goals.marginYear + ' best)</span>' +
-      '</div>' +
+      progressBar(currentData.margin, goals.margin, true, true) +
+      '<p class="goal-source">Best year: ' + goals.marginYear + '</p>' +
     '</div>';
   } else {
     marginCard = '<div class="kpi-card hero accent"><p class="kpi-label">' + current + ' Margin</p><p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p></div>';
@@ -312,10 +316,7 @@ function renderKPIs() {
   var trend = recentTrend();
   var trendCard;
   if (trend) {
-    var trendLabel = trend.pct > 5  ? 'Accelerating ↗' :
-                     trend.pct > 0  ? 'Trending Up' :
-                     trend.pct > -5 ? 'Steady' :
-                     'Refocusing';
+    var trendLabel = trend.pct >= 0 ? 'Above Prior Period' : 'Below Prior Period';
     var dir = trend.pct > 0.5 ? 'up' : (trend.pct < -0.5 ? 'down' : 'flat');
     var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
     trendCard = '<div class="kpi-card hero motivational">' +
