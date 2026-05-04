@@ -10,7 +10,7 @@
 <div class="dash-topbar">
   <div class="dash-topbar-left">
     {% if periods %}
-    <select class="period-select" onchange="window.location='/?period_id='+this.value">
+    <select class="period-select" onchange="window.location='/designer-detail?period_id='+this.value">
       {% for p in periods %}
       <option value="{{ p.id }}" {% if selected_period and selected_period.id == p.id %}selected{% endif %}>{{ p.label }}</option>
       {% endfor %}

@@ -312,7 +312,7 @@ function confirmAssignments() {
   })
   .then(function(data) {
     if (data.success) {
-      window.location.href = '/?period_id=' + data.period_id;
+      window.location.href = '/designer-detail?period_id=' + data.period_id;
     } else {
       alert('Error saving data: ' + (data.detail || 'unknown error'));
       btn.disabled = false;
@@ -338,7 +338,7 @@ function resetUpload() {
 function showDupModal(period) {
   document.getElementById('dupMsg').textContent =
     'This file was already uploaded as "' + period.label + '" on ' + period.uploaded_at + '.';
-  document.getElementById('dupLink').href = '/?period_id=' + period.id;
+  document.getElementById('dupLink').href = '/designer-detail?period_id=' + period.id;
   document.getElementById('dupModal').style.display = 'flex';
 }
 function closeDupModal() {

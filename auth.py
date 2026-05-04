@@ -70,6 +70,28 @@ class RequireAdmin:
         return user
 
 
+class RequireDesignerView:
+    """Allows admin only — for the designer-detail dashboard."""
+    def __call__(self, request: Request, db: Session = Depends(get_db)):
+        user = _user_from_request(request, db)
+        if not user:
+            raise _LoginRedirect()
+        if user.role not in ("admin",):
+            raise _ForbiddenRedirect()
+        return user
+
+
+class RequireCompanyView:
+    """Allows admin and display roles — company-level view (no designer detail)."""
+    def __call__(self, request: Request, db: Session = Depends(get_db)):
+        user = _user_from_request(request, db)
+        if not user:
+            raise _LoginRedirect()
+        if user.role not in ("admin", "display", "viewer"):
+            raise _ForbiddenRedirect()
+        return user
+
+
 class _LoginRedirect(Exception):
     pass
 
@@ -77,8 +99,10 @@ class _ForbiddenRedirect(Exception):
     pass
 
 
-get_current_user = RequireUser()
-require_admin    = RequireAdmin()
+get_current_user      = RequireUser()
+require_admin         = RequireAdmin()
+require_designer_view = RequireDesignerView()
+require_company_view  = RequireCompanyView()
 
 
 def get_optional_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:

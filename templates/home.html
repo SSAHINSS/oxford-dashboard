@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Oxford Design Dashboards{% endblock %}
+{% set active_page = "home" %}
+
+{% block content %}
+<div class="home-wrap">
+  <div class="home-intro">
+    <p class="home-eyebrow">Welcome, {{ user.email.split('@')[0] }}</p>
+    <h1 class="home-title">Choose a view</h1>
+  </div>
+
+  <div class="home-cards">
+    <a href="/company" class="home-card">
+      <div class="home-card-icon">◐</div>
+      <div class="home-card-body">
+        <h2 class="home-card-title">Company View</h2>
+        <p class="home-card-sub">High-level revenue, profit, and trends. Suitable for shared display. No designer detail.</p>
+      </div>
+      <div class="home-card-arrow">→</div>
+    </a>
+
+    <a href="/designer-detail" class="home-card">
+      <div class="home-card-icon">◑</div>
+      <div class="home-card-body">
+        <h2 class="home-card-title">Designer Detail</h2>
+        <p class="home-card-sub">Full breakdown by team member. Includes individual performance, project assignments, and detail comparisons.</p>
+      </div>
+      <div class="home-card-arrow">→</div>
+    </a>
+  </div>
+</div>
+{% endblock %}

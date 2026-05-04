@@ -20,6 +20,7 @@ from database import (
 from auth import (
     hash_password, verify_password, create_token,
     get_current_user, require_admin, get_optional_user,
+    require_designer_view, require_company_view,
     COOKIE_NAME, _LoginRedirect, _ForbiddenRedirect
 )
 from excel import parse_studio_export, norm_name
@@ -140,13 +141,8 @@ def logout():
 # DASHBOARD
 # ═══════════════════════════════════════════
 
-@app.get("/", response_class=HTMLResponse)
-def dashboard(
-    request:      Request,
-    period_id:    Optional[int] = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
+def _load_dashboard_data(period_id: Optional[int], db: Session) -> dict:
+    """Shared data loader for both the company view and the designer-detail view."""
     periods = (
         db.query(Period)
         .filter(Period.is_duplicate == False)
@@ -159,7 +155,6 @@ def dashboard(
     designer_summary = []
 
     if selected:
-        # LEFT outer join so clients without a designer still appear
         projects = (
             db.query(Project)
             .filter(Project.period_id == selected.id)
@@ -174,7 +169,7 @@ def dashboard(
                 "client":         p.client.name,
                 "designer":       des.name      if des else "Unassigned",
                 "designer_label": des.label     if des else "Unassigned",
-                "color_hex":      des.color_hex if des else "#a09585",  # warm taupe — reads as neutral
+                "color_hex":      des.color_hex if des else "#a09585",
                 "revenue":        round(float(p.revenue or 0), 2),
                 "profit":         round(float(p.profit or 0), 2),
                 "time_billing":   round(float(p.time_billing or 0), 2),
@@ -183,7 +178,6 @@ def dashboard(
                 "date_min":       p.date_min,
                 "date_max":       p.date_max,
             })
-
         des_map: dict = {}
         for p in projects_data:
             d = p["designer"]
@@ -203,15 +197,55 @@ def dashboard(
 
     designers = db.query(Designer).filter(Designer.active == True).order_by(Designer.name).all()
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request":          request,
-        "user":             current_user,
+    return {
         "periods":          periods,
         "selected_period":  selected,
         "projects":         json.dumps(projects_data),
         "designer_summary": json.dumps(designer_summary),
         "designers":        designers,
-    })
+    }
+
+
+@app.get("/", response_class=HTMLResponse)
+def home(
+    request:      Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Role-aware landing.
+    - display role → /company
+    - viewer role → /company
+    - admin → chooser page
+    """
+    if current_user.role in ("display", "viewer"):
+        return RedirectResponse(url="/company", status_code=302)
+    return templates.TemplateResponse("home.html", {"request": request, "user": current_user})
+
+
+@app.get("/company", response_class=HTMLResponse)
+def company_view(
+    request:      Request,
+    period_id:    Optional[int] = None,
+    current_user: User = Depends(require_company_view),
+    db: Session = Depends(get_db)
+):
+    """Company-level dashboard. No designer breakdown. For office display + everyone."""
+    data = _load_dashboard_data(period_id, db)
+    data.update({"request": request, "user": current_user})
+    return templates.TemplateResponse("company.html", data)
+
+
+@app.get("/designer-detail", response_class=HTMLResponse)
+def designer_detail(
+    request:      Request,
+    period_id:    Optional[int] = None,
+    current_user: User = Depends(require_designer_view),
+    db: Session = Depends(get_db)
+):
+    """Designer-level detail dashboard. Admin only."""
+    data = _load_dashboard_data(period_id, db)
+    data.update({"request": request, "user": current_user})
+    return templates.TemplateResponse("dashboard.html", data)
 
 
 @app.post("/designers/retune-colors")
@@ -237,11 +271,10 @@ def delete_period(
     period = db.query(Period).filter(Period.id == period_id).first()
     if not period:
         raise HTTPException(status_code=404)
-    # Delete all projects for this period first
     db.query(Project).filter(Project.period_id == period_id).delete()
     db.delete(period)
     db.commit()
-    return RedirectResponse(url="/", status_code=302)
+    return RedirectResponse(url="/designer-detail", status_code=302)
 
 
 # ═══════════════════════════════════════════
@@ -574,7 +607,7 @@ def users_page(request: Request, current_user: User = Depends(require_admin), db
 @app.post("/users/add")
 def add_user(email: str = Form(...), password: str = Form(...), role: str = Form(...),
              current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
-    if role not in ("admin", "viewer"):
+    if role not in ("admin", "viewer", "display"):
         raise HTTPException(status_code=400, detail="Invalid role")
     if db.query(User).filter(User.email == email.lower().strip()).first():
         raise HTTPException(status_code=400, detail="Email already registered")

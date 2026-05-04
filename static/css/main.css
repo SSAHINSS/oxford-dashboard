@@ -126,8 +126,9 @@ body {
   text-transform: uppercase;
   font-weight: 500;
 }
-.role-admin  { background: var(--gold); color: var(--deep-olive); }
-.role-viewer { background: rgba(252,248,243,0.1); color: rgba(252,248,243,0.7); }
+.role-admin   { background: var(--gold); color: var(--deep-olive); }
+.role-viewer  { background: rgba(252,248,243,0.1); color: rgba(252,248,243,0.7); }
+.role-display { background: rgba(184, 150, 83, 0.25); color: var(--gold-light); }
 .nav-logout {
   font-family: var(--sans);
   font-size: 10px;
@@ -1316,3 +1317,165 @@ body {
 .team-btn.on { border-left-width: 3px !important; border-left-style: solid !important; }
 
 #teamRow { align-items: center; }
+
+/* ════════════════════════════════════════════════
+   HOME (chooser page)
+   ════════════════════════════════════════════════ */
+.home-wrap { max-width: 900px; margin: 60px auto; padding: 0 24px; }
+.home-intro { margin-bottom: 48px; text-align: center; }
+.home-eyebrow {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 14px;
+}
+.home-title {
+  font-family: var(--serif);
+  font-size: 52px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  line-height: 1;
+}
+.home-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.home-card {
+  background: white;
+  border: 1px solid var(--border);
+  padding: 36px 32px;
+  text-decoration: none;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  transition: all 0.25s;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+.home-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 4px; height: 64px;
+  background: var(--deep-olive);
+  transition: height 0.25s;
+}
+.home-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+.home-card:hover::before { height: 100%; }
+.home-card-icon {
+  font-family: var(--serif);
+  font-size: 44px;
+  color: var(--deep-olive);
+  flex-shrink: 0;
+  line-height: 1;
+}
+.home-card-body { flex: 1; }
+.home-card-title {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.home-card-sub {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-light);
+  line-height: 1.55;
+}
+.home-card-arrow {
+  font-family: var(--sans);
+  font-size: 20px;
+  color: var(--deep-olive);
+  opacity: 0.4;
+  transition: all 0.2s;
+}
+.home-card:hover .home-card-arrow { opacity: 1; transform: translateX(4px); }
+
+@media (max-width: 700px) {
+  .home-cards { grid-template-columns: 1fr; }
+  .home-title { font-size: 36px; }
+}
+
+/* ════════════════════════════════════════════════
+   COMPANY VIEW
+   ════════════════════════════════════════════════ */
+.company-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-light);
+}
+.company-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Filter drawer */
+.filter-drawer {
+  display: flex;
+  align-items: flex-end;
+  gap: 28px;
+  flex-wrap: wrap;
+  padding: 18px 22px;
+  background: white;
+  border: 1px solid var(--border);
+  margin-bottom: 32px;
+  box-shadow: var(--shadow-sm);
+  animation: slideDown 0.2s;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Hero KPI cards — bigger for office display */
+.kpi-grid.hero { gap: 22px; margin-bottom: 64px; }
+.kpi-card.hero {
+  padding: 32px 30px 26px;
+  min-height: 280px;
+}
+.kpi-card.hero .kpi-label {
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  margin-bottom: 18px;
+}
+.kpi-card.hero .kpi-value {
+  font-size: 56px;
+  margin-bottom: 8px;
+}
+.kpi-card.hero .kpi-context {
+  font-size: 11px;
+  margin-bottom: 18px;
+}
+.kpi-card.hero .kpi-spark {
+  height: 56px;
+  margin: 0 -4px 16px;
+}
+.kpi-card.hero .kpi-trend {
+  font-size: 12px;
+  padding-top: 14px;
+}
+.kpi-card.hero .trend-pill { font-size: 12px; padding: 3px 10px; }
+
+@media (max-width: 1100px) {
+  .kpi-card.hero .kpi-value { font-size: 44px; }
+}
+@media (max-width: 820px) {
+  .kpi-card.hero .kpi-value { font-size: 36px; }
+}
