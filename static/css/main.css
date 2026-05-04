@@ -1642,14 +1642,17 @@ body.company-view .main {
 
 /* Bar with tick marks */
 .thermo-bar-wrap {
-  margin: 36px 0 24px;
+  margin: 60px 0 24px;
   position: relative;
+  padding: 0 8px;
+  overflow: visible;
 }
 .thermo-track {
   position: relative;
-  height: 36px;
-  background: var(--olive-faint);
-  border-radius: 2px;
+  height: 32px;
+  background: #e4e6dc;
+  border: 1px solid var(--border);
+  border-radius: 3px;
   overflow: visible;
 }
 .thermo-fill {
@@ -1657,6 +1660,7 @@ body.company-view .main {
   border-radius: 2px;
   transition: width 1s ease-out;
   position: relative;
+  min-width: 4px;
 }
 .thermo-fill.achieved {
   background: var(--pos) !important;
@@ -1674,10 +1678,10 @@ body.company-view .main {
 /* Tick marks */
 .thermo-tick {
   position: absolute;
-  top: -6px;
-  bottom: -6px;
+  top: -4px;
+  bottom: -4px;
   width: 1px;
-  background: var(--border);
+  background: var(--ink-xlight);
   pointer-events: none;
   z-index: 1;
 }
@@ -1689,36 +1693,42 @@ body.company-view .main {
   font-family: var(--sans);
   font-size: 10px;
   font-weight: 600;
-  color: var(--ink-xlight);
+  color: var(--ink-light);
   letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 /* Marker / current position */
 .thermo-marker {
   position: absolute;
-  top: -28px;
+  top: -34px;
   transform: translateX(-50%);
-  z-index: 2;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
+  pointer-events: none;
 }
 .thermo-marker-label {
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
   margin-bottom: 4px;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
   white-space: nowrap;
+  background: white;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
 }
 .thermo-marker-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: 3px solid white;
-  box-shadow: 0 0 0 1px var(--border);
+  box-shadow: 0 0 0 1px var(--ink-light), 0 2px 6px rgba(0,0,0,0.15);
 }
 
 /* Status row */
