@@ -1484,13 +1484,17 @@ body {
    COMPANY VIEW — MOTIVATIONAL ELEMENTS
    ════════════════════════════════════════════════ */
 
-/* Three-column hero grid — overrides 4-col default */
+/* Three-column hero grid — full width, matches chart-wrap below */
 .kpi-grid.hero {
+  display: grid !important;
   grid-template-columns: repeat(3, 1fr) !important;
-  gap: 22px;
+  gap: 18px;
+  width: 100%;
+  margin-bottom: 56px;
 }
-@media (max-width: 1100px) { .kpi-grid.hero { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 720px)  { .kpi-grid.hero { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .kpi-grid.hero { grid-template-columns: 1fr !important; }
+}
 
 /* Motivational card variant — match chart-wrap padding (30px) */
 .kpi-card.motivational { padding: 30px; }
