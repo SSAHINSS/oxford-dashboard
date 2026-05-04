@@ -1583,3 +1583,15 @@ body {
   border-top: 1px solid var(--border-light);
   font-style: italic;
 }
+
+
+/* ════════════════════════════════════════════════
+   COMPANY VIEW — full-width for office display
+   ════════════════════════════════════════════════ */
+body.company-view .main {
+  max-width: none;
+  padding: 32px 48px 64px;
+}
+@media (max-width: 1024px) {
+  body.company-view .main { padding: 24px 24px 48px; }
+}
