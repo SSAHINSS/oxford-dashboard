@@ -1479,3 +1479,68 @@ body {
 @media (max-width: 820px) {
   .kpi-card.hero .kpi-value { font-size: 36px; }
 }
+
+/* ════════════════════════════════════════════════
+   COMPANY VIEW — MOTIVATIONAL ELEMENTS
+   ════════════════════════════════════════════════ */
+
+/* Three-column hero grid (instead of four) */
+.company-topbar + .filter-drawer + .kpi-grid.hero,
+.company-topbar + .kpi-grid.hero {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 1100px) { .kpi-grid.hero { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 720px)  { .kpi-grid.hero { grid-template-columns: 1fr; } }
+
+/* Motivational card variant */
+.kpi-card.motivational { padding: 28px 28px 22px; }
+
+/* Progress bar */
+.progress-track {
+  height: 8px;
+  background: var(--olive-faint);
+  margin: 14px 0 10px;
+  overflow: hidden;
+  border-radius: 1px;
+}
+.progress-fill {
+  height: 100%;
+  transition: width 0.6s ease-out;
+  position: relative;
+}
+.progress-fill.complete {
+  background: var(--pos) !important;
+}
+.progress-fill.complete::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer 2.5s infinite;
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.progress-text {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-light);
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  font-feature-settings: 'tnum';
+}
+.progress-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  background: var(--pos);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-left: 6px;
+  border-radius: 1px;
+}

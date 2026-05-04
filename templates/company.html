@@ -20,7 +20,7 @@
     <span class="period-meta">{{ selected_period.uploaded_at.strftime('%b %d, %Y') }}</span>
     {% endif %}
   </div>
-  <button class="btn-ghost small" onclick="toggleFilterDrawer()" id="drawerToggle">⚙ Filters</button>
+  <button class="btn-ghost small" onclick="toggleFilterDrawer()">⚙ Filters</button>
 </div>
 
 <!-- Collapsible filter drawer -->
@@ -28,36 +28,6 @@
   <div class="date-filter-group">
     <span class="tg-label">Year</span>
     <div class="btn-row" id="yearRow"></div>
-  </div>
-  <div class="date-filter-group">
-    <span class="tg-label">Presets</span>
-    <div class="btn-row" id="presetRow">
-      <button class="f-btn on" data-p="all" onclick="setPreset('all',this)">All</button>
-      <button class="f-btn"    data-p="ytd" onclick="setPreset('ytd',this)">YTD</button>
-      <button class="f-btn"    data-p="q1"  onclick="setPreset('q1',this)">Q1</button>
-      <button class="f-btn"    data-p="q2"  onclick="setPreset('q2',this)">Q2</button>
-      <button class="f-btn"    data-p="q3"  onclick="setPreset('q3',this)">Q3</button>
-      <button class="f-btn"    data-p="q4"  onclick="setPreset('q4',this)">Q4</button>
-      <button class="f-btn"    data-p="h1"  onclick="setPreset('h1',this)">H1</button>
-      <button class="f-btn"    data-p="h2"  onclick="setPreset('h2',this)">H2</button>
-    </div>
-  </div>
-  <div class="date-filter-group">
-    <span class="tg-label">Months</span>
-    <div class="btn-row" id="monthRow">
-      <button class="f-btn" data-m="01" onclick="toggleMonth('01',this)">Jan</button>
-      <button class="f-btn" data-m="02" onclick="toggleMonth('02',this)">Feb</button>
-      <button class="f-btn" data-m="03" onclick="toggleMonth('03',this)">Mar</button>
-      <button class="f-btn" data-m="04" onclick="toggleMonth('04',this)">Apr</button>
-      <button class="f-btn" data-m="05" onclick="toggleMonth('05',this)">May</button>
-      <button class="f-btn" data-m="06" onclick="toggleMonth('06',this)">Jun</button>
-      <button class="f-btn" data-m="07" onclick="toggleMonth('07',this)">Jul</button>
-      <button class="f-btn" data-m="08" onclick="toggleMonth('08',this)">Aug</button>
-      <button class="f-btn" data-m="09" onclick="toggleMonth('09',this)">Sep</button>
-      <button class="f-btn" data-m="10" onclick="toggleMonth('10',this)">Oct</button>
-      <button class="f-btn" data-m="11" onclick="toggleMonth('11',this)">Nov</button>
-      <button class="f-btn" data-m="12" onclick="toggleMonth('12',this)">Dec</button>
-    </div>
   </div>
   <button class="btn-ghost small" onclick="clearDateFilters()">Clear</button>
 </div>
@@ -69,28 +39,28 @@
 </div>
 {% else %}
 
-<!-- HERO KPI CARDS — bigger, more prominent -->
+<!-- MOTIVATIONAL HERO CARDS -->
 <div class="kpi-grid hero" id="kpiGrid"></div>
 
-<!-- COMPANY TREND CHART -->
+<!-- COMPANY MONTHLY TREND -->
 <section style="margin-bottom: 56px;">
-  <div class="section-header"><span class="section-label">Monthly Trend</span><div class="section-line"></div></div>
+  <div class="section-header"><span class="section-label">This Year</span><div class="section-line"></div></div>
   <div class="chart-wrap">
     <div class="chart-tabs">
-      <button class="tab-btn active" data-mode="profit"       onclick="switchTrend('profit',this)">Profit</button>
-      <button class="tab-btn"        data-mode="revenue"      onclick="switchTrend('revenue',this)">Revenue</button>
-      <button class="tab-btn"        data-mode="margin"       onclick="switchTrend('margin',this)">Margin %</button>
-      <button class="tab-btn"        data-mode="time_billing" onclick="switchTrend('time_billing',this)">Time Billing</button>
+      <button class="tab-btn active" data-mode="profit"  onclick="switchTrend('profit',this)">Profit</button>
+      <button class="tab-btn"        data-mode="revenue" onclick="switchTrend('revenue',this)">Revenue</button>
+      <button class="tab-btn"        data-mode="margin"  onclick="switchTrend('margin',this)">Margin %</button>
     </div>
     <div class="chart-canvas-wrap" style="height:340px;"><canvas id="trendChart"></canvas></div>
+    <div class="legend-row" id="trendLegend" style="margin-top:18px;justify-content:center;"></div>
   </div>
 </section>
 
-<!-- YEAR-OVER-YEAR COMPARISON -->
+<!-- YEAR-OVER-YEAR (smaller, secondary) -->
 <section style="margin-bottom: 56px;">
-  <div class="section-header"><span class="section-label">Year-Over-Year</span><div class="section-line"></div></div>
+  <div class="section-header"><span class="section-label">Historical Context</span><div class="section-line"></div></div>
   <div class="chart-wrap">
-    <div class="chart-canvas-wrap" style="height:300px;"><canvas id="yoyChart"></canvas></div>
+    <div class="chart-canvas-wrap" style="height:280px;"><canvas id="yoyChart"></canvas></div>
     <div class="legend-row" id="yoyLegend" style="margin-top:18px;justify-content:center;"></div>
   </div>
 </section>
@@ -100,24 +70,24 @@
 
 {% block scripts %}
 <script>
-// Company view — high level only, no designer breakdown
 var ALL_PROJECTS = {{ projects | safe }};
 
-var dState = { year: 'all', months: [] };
-var trendChart = null;
-var yoyChart = null;
+var dState = { year: 'all' };
+var trendChart = null, yoyChart = null;
 var currentTrendMode = 'profit';
 
-// ─── Utilities ───
+// ─────────────────────────────────────────────────
+// UTILITIES
+// ─────────────────────────────────────────────────
 function fmt(n) {
-  if (!n || n === 0) return '—';
+  if (!n || n === 0) return '$0';
   if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
   if (Math.abs(n) >= 1e3) return '$' + Math.round(n/1e3) + 'K';
   return '$' + Math.round(n);
 }
 function monthName(mm) {
-  var names = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return names[parseInt(mm)] || '';
+  var n = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return n[parseInt(mm)] || '';
 }
 
 function toggleFilterDrawer() {
@@ -125,102 +95,136 @@ function toggleFilterDrawer() {
   d.style.display = d.style.display === 'none' ? 'flex' : 'none';
 }
 
-// ─── Filter state ───
-function filterByDate() {
-  var hasYear = dState.year !== 'all';
-  var hasMonths = dState.months.length > 0;
-  var totals = { revenue: 0, profit: 0, time_billing: 0 };
+// ─────────────────────────────────────────────────
+// AGGREGATE: by year-month
+// ─────────────────────────────────────────────────
+function aggregateByYearMonth() {
+  var byYM = {};
   for (var i = 0; i < ALL_PROJECTS.length; i++) {
     var md = ALL_PROJECTS[i].monthly_data || {};
     var keys = Object.keys(md);
     for (var j = 0; j < keys.length; j++) {
-      var k = keys[j], parts = k.split('-');
-      if (hasYear   && parts[0] !== dState.year) continue;
-      if (hasMonths && dState.months.indexOf(parts[1]) < 0) continue;
-      totals.revenue      += md[k].revenue      || 0;
-      totals.profit       += md[k].profit       || 0;
-      totals.time_billing += md[k].time_billing || 0;
+      var k = keys[j];
+      if (!byYM[k]) byYM[k] = { revenue:0, profit:0, time_billing:0 };
+      byYM[k].revenue      += md[k].revenue      || 0;
+      byYM[k].profit       += md[k].profit       || 0;
+      byYM[k].time_billing += md[k].time_billing || 0;
     }
   }
-  totals.margin = totals.revenue > 0 ? totals.profit / totals.revenue * 100 : 0;
-  return totals;
+  return byYM;
 }
 
-function filterLabel() {
-  var parts = [];
-  if (dState.months.length > 0) {
-    var ms = dState.months.slice().sort();
-    parts.push(ms.length <= 3 ? ms.map(monthName).join(', ') : ms.length + ' months');
-  }
-  if (dState.year !== 'all') parts.push(dState.year);
-  if (!parts.length) return 'All periods';
-  return parts.join(' · ');
+function aggregateByYear() {
+  var byYM = aggregateByYearMonth();
+  var byYear = {};
+  Object.keys(byYM).forEach(function(k) {
+    var y = k.split('-')[0];
+    if (!byYear[y]) byYear[y] = { revenue:0, profit:0, time_billing:0, monthsWithData:0 };
+    byYear[y].revenue      += byYM[k].revenue;
+    byYear[y].profit       += byYM[k].profit;
+    byYear[y].time_billing += byYM[k].time_billing;
+    if (byYM[k].revenue > 0) byYear[y].monthsWithData++;
+  });
+  Object.keys(byYear).forEach(function(y) {
+    var d = byYear[y];
+    d.margin = d.revenue > 0 ? d.profit/d.revenue*100 : 0;
+  });
+  return byYear;
 }
 
-// ─── Monthly series for sparklines ───
-function monthlySeries() {
-  var hasMonths = dState.months.length > 0;
-  var byMonth = {};
-  for (var i = 0; i < ALL_PROJECTS.length; i++) {
-    var md = ALL_PROJECTS[i].monthly_data || {};
-    var keys = Object.keys(md);
-    for (var j = 0; j < keys.length; j++) {
-      var k = keys[j], parts = k.split('-');
-      if (dState.year !== 'all' && parts[0] !== dState.year) continue;
-      if (hasMonths && dState.months.indexOf(parts[1]) < 0)  continue;
-      if (!byMonth[k]) byMonth[k] = {revenue:0, profit:0, time_billing:0};
-      byMonth[k].revenue      += md[k].revenue      || 0;
-      byMonth[k].profit       += md[k].profit       || 0;
-      byMonth[k].time_billing += md[k].time_billing || 0;
-    }
-  }
-  var keys = Object.keys(byMonth).sort();
-  var out = { revenue: [], profit: [], time_billing: [], margin: [], keys: keys };
-  for (var i = 0; i < keys.length; i++) {
-    var m = byMonth[keys[i]];
-    out.revenue.push(m.revenue);
-    out.profit.push(m.profit);
-    out.time_billing.push(m.time_billing);
-    out.margin.push(m.revenue > 0 ? m.profit/m.revenue*100 : 0);
-  }
-  return out;
+// ─────────────────────────────────────────────────
+// CURRENT YEAR DETECTION
+// ─────────────────────────────────────────────────
+function getCurrentYear() {
+  if (dState.year !== 'all') return dState.year;
+  // Most recent year that has data
+  var byYM = aggregateByYearMonth();
+  var years = Object.keys(byYM).map(function(k){return k.split('-')[0];});
+  return years.sort()[years.length - 1];
 }
 
-function priorYearDelta() {
-  if (dState.year === 'all') return null;
-  var hasMonths = dState.months.length > 0;
-  var priorYear = String(parseInt(dState.year) - 1);
-  var cur = {revenue:0, profit:0, time_billing:0};
-  var pri = {revenue:0, profit:0, time_billing:0};
-  for (var i = 0; i < ALL_PROJECTS.length; i++) {
-    var md = ALL_PROJECTS[i].monthly_data || {};
-    var keys = Object.keys(md);
-    for (var j = 0; j < keys.length; j++) {
-      var k = keys[j], parts = k.split('-');
-      if (hasMonths && dState.months.indexOf(parts[1]) < 0) continue;
-      var bucket = (parts[0] === dState.year) ? cur : (parts[0] === priorYear ? pri : null);
-      if (!bucket) continue;
-      bucket.revenue      += md[k].revenue      || 0;
-      bucket.profit       += md[k].profit       || 0;
-      bucket.time_billing += md[k].time_billing || 0;
-    }
+function getYearList() {
+  var byYM = aggregateByYearMonth();
+  var years = {};
+  Object.keys(byYM).forEach(function(k){ years[k.split('-')[0]] = true; });
+  return Object.keys(years).sort();
+}
+
+// ─────────────────────────────────────────────────
+// AUTO-CALCULATED GOALS (best historical year)
+// ─────────────────────────────────────────────────
+function computeGoals() {
+  var byYear = aggregateByYear();
+  var current = getCurrentYear();
+  var historical = Object.keys(byYear).filter(function(y){ return y !== current; });
+  if (!historical.length) {
+    return { revenue: null, margin: null, sourceYear: null };
   }
-  var curMargin = cur.revenue > 0 ? cur.profit/cur.revenue*100 : 0;
-  var priMargin = pri.revenue > 0 ? pri.profit/pri.revenue*100 : 0;
-  function cmp(c, p, isPct) {
-    if (p === 0) return null;
-    var d = isPct ? (c - p) : ((c - p) / Math.abs(p) * 100);
-    return { pct: d, isPct: !!isPct, priorYear: priorYear };
-  }
+  // Best historical revenue year
+  var bestRev = historical.reduce(function(best, y) {
+    if (!best || byYear[y].revenue > byYear[best].revenue) return y;
+    return best;
+  }, null);
+  var bestMargin = historical.reduce(function(best, y) {
+    if (!best || byYear[y].margin > byYear[best].margin) return y;
+    return best;
+  }, null);
   return {
-    revenue:      cmp(cur.revenue,      pri.revenue),
-    profit:       cmp(cur.profit,       pri.profit),
-    margin:       cmp(curMargin,        priMargin, true),
-    time_billing: cmp(cur.time_billing, pri.time_billing)
+    revenue:     byYear[bestRev].revenue,
+    revenueYear: bestRev,
+    margin:      byYear[bestMargin].margin,
+    marginYear:  bestMargin,
   };
 }
 
-// ─── Sparkline ───
+// ─────────────────────────────────────────────────
+// PROGRESS METER
+// ─────────────────────────────────────────────────
+function progressBar(actual, goal, accent) {
+  if (!goal || goal === 0) return '';
+  var pct = Math.min(100, Math.max(0, (actual / goal) * 100));
+  var color = accent ? '#b89653' : '#444735';
+  var bgClass = pct >= 100 ? 'progress-fill complete' : 'progress-fill';
+  return '<div class="progress-track">' +
+    '<div class="' + bgClass + '" style="width:' + pct + '%;background:' + color + ';"></div>' +
+  '</div>' +
+  '<p class="progress-text">' +
+    pct.toFixed(0) + '% of ' + (typeof goal === 'number' && goal > 1000 ? fmt(goal) : goal.toFixed(1) + '%') +
+    (pct >= 100 ? ' <span class="progress-badge">✓ Goal reached</span>' : '') +
+  '</p>';
+}
+
+// ─────────────────────────────────────────────────
+// 3-MONTH TREND (last 3 months of available data)
+// ─────────────────────────────────────────────────
+function recentTrend() {
+  var byYM = aggregateByYearMonth();
+  var keys = Object.keys(byYM).filter(function(k){ return byYM[k].revenue > 0; }).sort();
+  if (keys.length < 4) return null;  // need at least 4 months for "last 3 vs prior 3"
+  var last3 = keys.slice(-3);
+  var prior3 = keys.slice(-6, -3);
+  if (prior3.length < 1) return null;
+  function sum(arr) {
+    return arr.reduce(function(s, k) { return s + (byYM[k].revenue || 0); }, 0);
+  }
+  var recent = sum(last3);
+  var earlier = sum(prior3);
+  var pct = earlier > 0 ? ((recent - earlier) / earlier * 100) : 0;
+  return {
+    pct: pct,
+    recentValues: last3.map(function(k){ return byYM[k].revenue; }),
+    recentLabels: last3.map(function(k){
+      var p = k.split('-');
+      return monthName(p[1]) + " '" + p[0].slice(2);
+    }),
+    last3Sum: recent,
+    monthsCovered: last3.length
+  };
+}
+
+// ─────────────────────────────────────────────────
+// SPARKLINE
+// ─────────────────────────────────────────────────
 function sparkline(values, hex) {
   if (!values || values.length < 2) return '';
   var w = 320, h = 56;
@@ -240,98 +244,154 @@ function sparkline(values, hex) {
   var lastY = (h - ((values[values.length - 1] - min) / range) * (h - 8) - 4).toFixed(1);
   return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:100%;">' +
     '<polygon points="' + area + '" fill="' + hex + '" fill-opacity="0.10"/>' +
-    '<polyline points="' + line + '" fill="none" stroke="' + hex + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<circle cx="' + lastX + '" cy="' + lastY + '" r="3.5" fill="' + hex + '"/>' +
+    '<polyline points="' + line + '" fill="none" stroke="' + hex + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + lastX + '" cy="' + lastY + '" r="4" fill="' + hex + '"/>' +
   '</svg>';
 }
 
-// ─── KPI rendering ───
+// ─────────────────────────────────────────────────
+// RENDER MOTIVATIONAL KPI CARDS
+// ─────────────────────────────────────────────────
 function renderKPIs() {
-  var totals = filterByDate();
-  var ctx    = filterLabel();
-  var series = monthlySeries();
-  var prior  = priorYearDelta();
+  var byYear = aggregateByYear();
+  var byYM = aggregateByYearMonth();
+  var goals = computeGoals();
+  var current = getCurrentYear();
+  var currentData = byYear[current] || { revenue:0, profit:0, margin:0 };
 
-  var cards = [
-    { label:'Total Revenue',  value: fmt(totals.revenue),      series: series.revenue,      prior: prior ? prior.revenue : null },
-    { label:'Total Profit',   value: fmt(totals.profit),       series: series.profit,       prior: prior ? prior.profit : null, accent:true },
-    { label:'Overall Margin', value: totals.margin.toFixed(1)+'%', series: series.margin,   prior: prior ? prior.margin : null, isPercent:true },
-    { label:'Time Billing',   value: fmt(totals.time_billing), series: series.time_billing, prior: prior ? prior.time_billing : null }
-  ];
-
-  var html = cards.map(function(c) { return kpiCardHtml(c, ctx); }).join('');
-  document.getElementById('kpiGrid').innerHTML = html;
-}
-
-function kpiCardHtml(c, ctx) {
-  var hex = c.accent ? '#b89653' : '#444735';
-  var spark = (c.series && c.series.length >= 2) ? sparkline(c.series, hex) : '';
-  var trend = '';
-  if (c.prior && c.prior.pct !== null && c.prior.pct !== undefined) {
-    var dir = c.prior.pct > 0.1 ? 'up' : (c.prior.pct < -0.1 ? 'down' : 'flat');
-    var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
-    var v = c.prior.isPct ? Math.abs(c.prior.pct).toFixed(1) + 'pts' : Math.abs(c.prior.pct).toFixed(0) + '%';
-    trend = '<div class="kpi-trend ' + dir + '">' +
-      '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + v + '</span>' +
-      '<span class="trend-meta">vs ' + c.prior.priorYear + '</span>' +
+  // Card 1: Pace toward annual revenue goal
+  var pacePct = goals.revenue ? (currentData.revenue / goals.revenue * 100) : null;
+  var paceCard;
+  if (goals.revenue) {
+    var paceLabel = pacePct >= 100 ? 'Goal Achieved!' :
+                    pacePct >= 75  ? 'On Track' :
+                    pacePct >= 50  ? 'Steady Progress' :
+                    'Building Momentum';
+    paceCard = '<div class="kpi-card hero motivational">' +
+      '<p class="kpi-label">' + current + ' REVENUE PACE</p>' +
+      '<p class="kpi-value">' + fmt(currentData.revenue) + '</p>' +
+      '<p class="kpi-context">' + paceLabel + '</p>' +
+      progressBar(currentData.revenue, goals.revenue, false) +
+      '<div class="kpi-trend flat" style="border-top-color:transparent;padding-top:6px;">' +
+        '<span class="trend-meta">Goal: ' + fmt(goals.revenue) + ' (' + goals.revenueYear + ' best)</span>' +
+      '</div>' +
     '</div>';
-  } else if (c.series && c.series.length >= 2) {
-    var a = c.series[0], b = c.series[c.series.length - 1];
-    if (Math.abs(a) > 0.01) {
-      var delta = c.isPercent ? (b - a) : ((b - a) / Math.abs(a) * 100);
-      var dir = delta > 0.1 ? 'up' : (delta < -0.1 ? 'down' : 'flat');
-      var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
-      var v = c.isPercent ? Math.abs(delta).toFixed(1) + 'pts' : Math.abs(delta).toFixed(0) + '%';
-      trend = '<div class="kpi-trend ' + dir + '">' +
-        '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + v + '</span>' +
-        '<span class="trend-meta">over period</span>' +
-      '</div>';
-    }
+  } else {
+    paceCard = '<div class="kpi-card hero"><p class="kpi-label">' + current + ' Revenue</p><p class="kpi-value">' + fmt(currentData.revenue) + '</p><p class="kpi-context">No prior year for goal</p></div>';
   }
-  if (!trend) trend = '<div class="kpi-trend flat"><span class="trend-meta">No comparison data</span></div>';
 
-  return '<div class="kpi-card hero' + (c.accent ? ' accent' : '') + '">' +
-    '<p class="kpi-label">' + c.label + '</p>' +
-    '<p class="kpi-value">' + c.value + '</p>' +
-    '<p class="kpi-context">' + ctx + '</p>' +
-    '<div class="kpi-spark">' + spark + '</div>' +
-    trend +
-  '</div>';
+  // Card 2: Margin % vs target
+  var marginCard;
+  if (goals.margin) {
+    var marginPct = goals.margin > 0 ? (currentData.margin / goals.margin * 100) : 0;
+    var marginLabel = currentData.margin >= goals.margin ? 'Above Target' :
+                      marginPct >= 90  ? 'Near Target' :
+                      marginPct >= 75  ? 'Building Strength' :
+                      'Room to Grow';
+    marginCard = '<div class="kpi-card hero motivational accent">' +
+      '<p class="kpi-label">' + current + ' MARGIN</p>' +
+      '<p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p>' +
+      '<p class="kpi-context">' + marginLabel + '</p>' +
+      progressBar(currentData.margin, goals.margin, true) +
+      '<div class="kpi-trend flat" style="border-top-color:transparent;padding-top:6px;">' +
+        '<span class="trend-meta">Target: ' + goals.margin.toFixed(1) + '% (' + goals.marginYear + ' best)</span>' +
+      '</div>' +
+    '</div>';
+  } else {
+    marginCard = '<div class="kpi-card hero accent"><p class="kpi-label">' + current + ' Margin</p><p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p></div>';
+  }
+
+  // Card 3: Recent 3-month trend
+  var trend = recentTrend();
+  var trendCard;
+  if (trend) {
+    var trendLabel = trend.pct > 5  ? 'Accelerating ↗' :
+                     trend.pct > 0  ? 'Trending Up' :
+                     trend.pct > -5 ? 'Steady' :
+                     'Refocusing';
+    var dir = trend.pct > 0.5 ? 'up' : (trend.pct < -0.5 ? 'down' : 'flat');
+    var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
+    trendCard = '<div class="kpi-card hero motivational">' +
+      '<p class="kpi-label">90-DAY MOMENTUM</p>' +
+      '<p class="kpi-value">' + fmt(trend.last3Sum) + '</p>' +
+      '<p class="kpi-context">' + trendLabel + '</p>' +
+      '<div class="kpi-spark">' + sparkline(trend.recentValues, '#444735') + '</div>' +
+      '<div class="kpi-trend ' + dir + '">' +
+        '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + Math.abs(trend.pct).toFixed(0) + '%</span>' +
+        '<span class="trend-meta">vs prior 3 months</span>' +
+      '</div>' +
+    '</div>';
+  } else {
+    trendCard = '<div class="kpi-card hero"><p class="kpi-label">90-Day Momentum</p><p class="kpi-value">—</p><p class="kpi-context">Not enough history yet</p></div>';
+  }
+
+  document.getElementById('kpiGrid').innerHTML = paceCard + marginCard + trendCard;
 }
 
-// ─── Trend chart (monthly across selected scope) ───
+// ─────────────────────────────────────────────────
+// MONTHLY TREND CHART (current year vs goal year)
+// ─────────────────────────────────────────────────
 function buildTrendChart(mode) {
-  var series = monthlySeries();
   if (trendChart) { trendChart.destroy(); trendChart = null; }
   var wrap = document.getElementById('trendChart').parentNode;
   wrap.innerHTML = '<canvas id="trendChart"></canvas>';
   var ctx = document.getElementById('trendChart').getContext('2d');
-  var labels = series.keys.map(function(k) {
-    var p = k.split('-');
-    return monthName(p[1]) + " '" + p[0].slice(2);
-  });
-  var color = '#444735';
+  var byYM = aggregateByYearMonth();
+  var current = getCurrentYear();
+  var goals = computeGoals();
+  var goalYear = goals.revenueYear;
+
+  var monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+
+  function valuesForYear(y) {
+    return months.map(function(m) {
+      var k = y + '-' + m;
+      var d = byYM[k];
+      if (!d) return null;  // gap-out missing months
+      if (mode === 'margin') {
+        return d.revenue > 0 ? d.profit/d.revenue*100 : null;
+      }
+      return d[mode] || 0;
+    });
+  }
+
+  var datasets = [{
+    label: current,
+    data: valuesForYear(current),
+    borderColor: '#444735',
+    backgroundColor: 'rgba(68,71,53,0.10)',
+    borderWidth: 3,
+    tension: 0.25, fill: true,
+    pointRadius: 4, pointBackgroundColor: '#444735',
+    pointBorderColor: '#fff', pointBorderWidth: 1.5,
+    spanGaps: false
+  }];
+
+  if (goalYear) {
+    datasets.push({
+      label: goalYear + ' (goal)',
+      data: valuesForYear(goalYear),
+      borderColor: '#b89653',
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderDash: [4, 4],
+      tension: 0.25, fill: false,
+      pointRadius: 2, pointBackgroundColor: '#b89653',
+      spanGaps: true
+    });
+  }
+
   var fmtFn = mode === 'margin' ? function(v){return (v||0).toFixed(1)+'%';} : function(v){return fmt(v);};
   trendChart = new Chart(ctx, {
     type: 'line',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: mode,
-        data: series[mode],
-        borderColor: color,
-        backgroundColor: color + '15',
-        borderWidth: 2.5, tension: 0.25,
-        fill: true, pointRadius: 4, pointBackgroundColor: color,
-        pointBorderColor: '#fff', pointBorderWidth: 1.5
-      }]
-    },
+    data: { labels: monthLabels, datasets: datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
-          callbacks: { label: function(c){return ' ' + fmtFn(c.raw);} },
+          callbacks: { label: function(c){return c.dataset.label + ': ' + fmtFn(c.raw);} },
           backgroundColor: 'rgba(53,55,56,0.94)', titleColor: '#d4b984', bodyColor: '#fcf8f3',
           padding: 12, cornerRadius: 2
         }
@@ -344,6 +404,11 @@ function buildTrendChart(mode) {
     }
   });
   currentTrendMode = mode;
+
+  // Custom legend
+  var html = '<span class="leg-item"><span class="leg-dot" style="background:#444735;"></span>' + current + ' (current)</span>';
+  if (goalYear) html += '<span class="leg-item"><span class="leg-dot" style="background:#b89653;border:2px dashed #b89653;background:transparent;"></span>' + goalYear + ' (goal pace)</span>';
+  document.getElementById('trendLegend').innerHTML = html;
 }
 
 function switchTrend(mode, btn) {
@@ -352,42 +417,30 @@ function switchTrend(mode, btn) {
   buildTrendChart(mode);
 }
 
-// ─── YoY chart: stacked column for current vs prior years ───
+// ─────────────────────────────────────────────────
+// YOY CHART (smaller, secondary)
+// ─────────────────────────────────────────────────
 function buildYoYChart() {
   if (yoyChart) { yoyChart.destroy(); yoyChart = null; }
   var wrap = document.getElementById('yoyChart').parentNode;
   wrap.innerHTML = '<canvas id="yoyChart"></canvas>';
   var ctx = document.getElementById('yoyChart').getContext('2d');
+  var byYM = aggregateByYearMonth();
+  var years = getYearList();
 
-  // Gather each year's monthly data
-  var byYearMonth = {};
-  for (var i = 0; i < ALL_PROJECTS.length; i++) {
-    var md = ALL_PROJECTS[i].monthly_data || {};
-    var keys = Object.keys(md);
-    for (var j = 0; j < keys.length; j++) {
-      var k = keys[j], parts = k.split('-');
-      var y = parts[0], m = parts[1];
-      if (!byYearMonth[y]) byYearMonth[y] = {};
-      if (!byYearMonth[y][m]) byYearMonth[y][m] = {revenue:0, profit:0, time_billing:0};
-      byYearMonth[y][m].revenue += md[k].revenue || 0;
-      byYearMonth[y][m].profit  += md[k].profit  || 0;
-      byYearMonth[y][m].time_billing += md[k].time_billing || 0;
-    }
-  }
-  var years = Object.keys(byYearMonth).sort();
-  var colors = ['#a8a8a9', '#8a8e73', '#b89653', '#444735'];  // older = lighter
+  var palette = ['#a8a8a9', '#8a8e73', '#b89653', '#444735'];
   var monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
 
   var datasets = years.map(function(y, idx) {
-    var c = colors[Math.min(colors.length - 1, idx + (colors.length - years.length))];
-    var data = ['01','02','03','04','05','06','07','08','09','10','11','12'].map(function(m){
-      return (byYearMonth[y][m] || {}).revenue || 0;
-    });
+    var c = palette[Math.min(palette.length - 1, idx + (palette.length - years.length))];
     return {
       label: y,
-      data: data,
-      backgroundColor: c + 'cc',
-      borderColor: c,
+      data: months.map(function(m){
+        var k = y + '-' + m;
+        return (byYM[k] || {}).revenue || 0;
+      }),
+      backgroundColor: c + 'cc', borderColor: c,
       borderWidth: 1, borderRadius: 2
     };
   });
@@ -413,29 +466,24 @@ function buildYoYChart() {
     }
   });
 
-  // Custom legend
   var legend = years.map(function(y, idx) {
-    var c = colors[Math.min(colors.length - 1, idx + (colors.length - years.length))];
+    var c = palette[Math.min(palette.length - 1, idx + (palette.length - years.length))];
     return '<span class="leg-item"><span class="leg-dot" style="background:'+c+';"></span>'+y+'</span>';
   }).join('');
-  document.getElementById('yoyLegend').innerHTML = legend + '<span class="leg-item" style="color:var(--ink-xlight);font-style:italic;font-size:10px;">Revenue by month</span>';
+  document.getElementById('yoyLegend').innerHTML = legend +
+    '<span class="leg-item" style="color:var(--ink-xlight);font-style:italic;font-size:10px;">Revenue by month</span>';
 }
 
-// ─── Filter controls ───
+// ─────────────────────────────────────────────────
+// FILTER CONTROLS (year selector, drawer)
+// ─────────────────────────────────────────────────
 function buildYearBtns() {
-  var years = {};
-  for (var i = 0; i < ALL_PROJECTS.length; i++) {
-    var md = ALL_PROJECTS[i].monthly_data || {};
-    var keys = Object.keys(md);
-    for (var j = 0; j < keys.length; j++) years[keys[j].split('-')[0]] = true;
-  }
-  var yearList = Object.keys(years).sort();
-  if (!yearList.length) return;
-  var html = '<button class="f-btn on" data-y="all" onclick="setYear(\'all\',this)">All</button>';
-  for (var i = 0; i < yearList.length; i++) {
-    var y = yearList[i];
+  var years = getYearList();
+  if (!years.length) return;
+  var html = '<button class="f-btn on" data-y="all" onclick="setYear(\'all\',this)">Auto (latest)</button>';
+  years.forEach(function(y) {
     html += '<button class="f-btn" data-y="' + y + '" onclick="setYear(\'' + y + '\',this)">' + y + '</button>';
-  }
+  });
   document.getElementById('yearRow').innerHTML = html;
 }
 
@@ -446,51 +494,11 @@ function setYear(val, btn) {
   refreshAll();
 }
 
-function setPreset(name, btn) {
-  if (name === 'all') dState.months = [];
-  else if (name === 'ytd') {
-    var cur = (new Date()).getMonth() + 1, out = [];
-    for (var i = 1; i <= cur; i++) out.push(i < 10 ? '0'+i : ''+i);
-    dState.months = out;
-  }
-  else if (name === 'q1') dState.months = ['01','02','03'];
-  else if (name === 'q2') dState.months = ['04','05','06'];
-  else if (name === 'q3') dState.months = ['07','08','09'];
-  else if (name === 'q4') dState.months = ['10','11','12'];
-  else if (name === 'h1') dState.months = ['01','02','03','04','05','06'];
-  else if (name === 'h2') dState.months = ['07','08','09','10','11','12'];
-  document.querySelectorAll('#presetRow .f-btn').forEach(function(b){b.classList.remove('on');});
-  btn.classList.add('on');
-  syncMonthButtons();
-  refreshAll();
-}
-
-function toggleMonth(m, btn) {
-  var idx = dState.months.indexOf(m);
-  if (idx >= 0) dState.months.splice(idx, 1);
-  else          dState.months.push(m);
-  document.querySelectorAll('#presetRow .f-btn').forEach(function(b){b.classList.remove('on');});
-  if (dState.months.length === 0) {
-    var allBtn = document.querySelector('#presetRow .f-btn[data-p="all"]');
-    if (allBtn) allBtn.classList.add('on');
-  }
-  syncMonthButtons();
-  refreshAll();
-}
-
-function syncMonthButtons() {
-  document.querySelectorAll('#monthRow .f-btn').forEach(function(b) {
-    var m = b.getAttribute('data-m');
-    if (dState.months.indexOf(m) >= 0) b.classList.add('on');
-    else                                b.classList.remove('on');
-  });
-}
-
 function clearDateFilters() {
-  dState = { year:'all', months:[] };
-  document.querySelectorAll('#yearRow .f-btn, #monthRow .f-btn, #presetRow .f-btn').forEach(function(b){b.classList.remove('on');});
-  var a = document.querySelector('#yearRow .f-btn[data-y="all"]');  if (a) a.classList.add('on');
-  var b = document.querySelector('#presetRow .f-btn[data-p="all"]'); if (b) b.classList.add('on');
+  dState = { year: 'all' };
+  document.querySelectorAll('#yearRow .f-btn').forEach(function(b){b.classList.remove('on');});
+  var a = document.querySelector('#yearRow .f-btn[data-y="all"]');
+  if (a) a.classList.add('on');
   refreshAll();
 }
 
@@ -499,7 +507,9 @@ function refreshAll() {
   buildTrendChart(currentTrendMode);
 }
 
-// ─── Init ───
+// ─────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────
 if (ALL_PROJECTS.length) {
   renderKPIs();
   buildTrendChart('profit');
