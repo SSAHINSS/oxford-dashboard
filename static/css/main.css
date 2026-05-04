@@ -1595,3 +1595,158 @@ body.company-view .main {
 @media (max-width: 1024px) {
   body.company-view .main { padding: 24px 24px 48px; }
 }
+
+/* ════════════════════════════════════════════════
+   COMPANY VIEW — KPI sublabels and thermometer
+   ════════════════════════════════════════════════ */
+
+.kpi-sublabel {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-xlight);
+  letter-spacing: 0.06em;
+  font-style: italic;
+  margin-bottom: 14px;
+  margin-top: -8px;
+}
+
+/* Thermometer */
+.thermo-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+}
+.thermo-stat .thermo-stat-label {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 6px;
+}
+.thermo-stat.align-right { text-align: right; }
+.thermo-stat-value {
+  font-family: var(--serif);
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.thermo-stat.align-right .thermo-stat-value {
+  color: var(--gold-dark);
+}
+
+/* Bar with tick marks */
+.thermo-bar-wrap {
+  margin: 36px 0 24px;
+  position: relative;
+}
+.thermo-track {
+  position: relative;
+  height: 36px;
+  background: var(--olive-faint);
+  border-radius: 2px;
+  overflow: visible;
+}
+.thermo-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s ease-out;
+  position: relative;
+}
+.thermo-fill.achieved {
+  background: var(--pos) !important;
+  position: relative;
+}
+.thermo-fill.achieved::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: shimmer 2.5s infinite;
+  border-radius: 2px;
+}
+
+/* Tick marks */
+.thermo-tick {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+  z-index: 1;
+}
+.thermo-tick-label {
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-xlight);
+  letter-spacing: 0.06em;
+}
+
+/* Marker / current position */
+.thermo-marker {
+  position: absolute;
+  top: -28px;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.thermo-marker-label {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.thermo-marker-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* Status row */
+.thermo-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 36px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-light);
+}
+.thermo-status-pill {
+  display: inline-block;
+  padding: 6px 14px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.thermo-status-pill.achieved  { background: var(--pos); color: white; }
+.thermo-status-pill.on-track  { background: var(--olive-faint); color: var(--deep-olive); border: 1px solid var(--olive-light); }
+.thermo-status-pill.building  { background: var(--gold-faint); color: var(--gold-dark); border: 1px solid var(--gold-light); }
+.thermo-remaining {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-light);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-style: italic;
+}

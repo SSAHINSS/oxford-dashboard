@@ -43,9 +43,21 @@
 <!-- MOTIVATIONAL HERO CARDS -->
 <div class="kpi-grid hero" id="kpiGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;width:100%;"></div>
 
-<!-- COMPANY THIS-YEAR CHART -->
+<!-- CUMULATIVE PROGRESS — thermometer style -->
 <section style="margin-bottom: 56px;">
-  <div class="section-header"><span class="section-label">This Year</span><div class="section-line"></div></div>
+  <div class="section-header"><span class="section-label">Year Progress</span><div class="section-line"></div></div>
+  <div class="chart-wrap">
+    <div class="chart-tabs" style="margin-bottom: 32px;">
+      <button class="tab-btn active" data-mode="revenue" onclick="switchTracker('revenue',this)">Revenue</button>
+      <button class="tab-btn"        data-mode="profit"  onclick="switchTracker('profit',this)">Profit</button>
+    </div>
+    <div id="thermometerWrap"></div>
+  </div>
+</section>
+
+<!-- MONTHLY/QUARTERLY DETAIL CHART -->
+<section style="margin-bottom: 56px;">
+  <div class="section-header"><span class="section-label">By Period</span><div class="section-line"></div></div>
   <div class="chart-wrap">
     <div class="chart-toolbar">
       <div class="chart-tabs">
@@ -54,8 +66,8 @@
         <button class="tab-btn"        data-mode="margin"  onclick="switchTrend('margin',this)">Margin %</button>
       </div>
       <div class="chart-tabs">
-        <button class="tab-btn"        data-period="monthly"   id="periodMonthly"   onclick="switchPeriod('monthly',this)">Monthly</button>
-        <button class="tab-btn active" data-period="quarterly" id="periodQuarterly" onclick="switchPeriod('quarterly',this)">Quarterly</button>
+        <button class="tab-btn"        data-period="monthly"   onclick="switchPeriod('monthly',this)">Monthly</button>
+        <button class="tab-btn active" data-period="quarterly" onclick="switchPeriod('quarterly',this)">Quarterly</button>
       </div>
     </div>
     <div class="chart-canvas-wrap" style="height:340px;"><canvas id="trendChart"></canvas></div>
@@ -83,6 +95,7 @@ var dState = { year: 'all' };
 var trendChart = null, yoyChart = null;
 var currentTrendMode = 'profit';
 var currentPeriodMode = 'quarterly';  // monthly | quarterly
+var currentTrackerMode = 'revenue';   // revenue | profit
 
 // ─────────────────────────────────────────────────
 // UTILITIES
@@ -284,11 +297,11 @@ function renderKPIs() {
   if (goals.revenue) {
     var paceLabel = pacePct >= 100 ? 'Above Target' : 'Below Target';
     paceCard = '<div class="kpi-card hero motivational">' +
-      '<p class="kpi-label">' + current + ' REVENUE PACE</p>' +
+      '<p class="kpi-label">' + current + ' Revenue (YTD)</p>' +
+      '<p class="kpi-sublabel">vs ' + goals.revenueYear + ' full-year total</p>' +
       '<p class="kpi-value">' + fmt(currentData.revenue) + '</p>' +
       '<p class="kpi-context">' + paceLabel + '</p>' +
       progressBar(currentData.revenue, goals.revenue, false) +
-      '<p class="goal-source">Best year: ' + goals.revenueYear + '</p>' +
     '</div>';
   } else {
     paceCard = '<div class="kpi-card hero"><p class="kpi-label">' + current + ' Revenue</p><p class="kpi-value">' + fmt(currentData.revenue) + '</p><p class="kpi-context">No prior year for goal</p></div>';
@@ -303,11 +316,11 @@ function renderKPIs() {
                       marginPct >= 75  ? 'Building Strength' :
                       'Room to Grow';
     marginCard = '<div class="kpi-card hero motivational accent">' +
-      '<p class="kpi-label">' + current + ' MARGIN</p>' +
+      '<p class="kpi-label">' + current + ' Margin (YTD)</p>' +
+      '<p class="kpi-sublabel">vs ' + goals.marginYear + ' full-year average</p>' +
       '<p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p>' +
       '<p class="kpi-context">' + marginLabel + '</p>' +
       progressBar(currentData.margin, goals.margin, true, true) +
-      '<p class="goal-source">Best year: ' + goals.marginYear + '</p>' +
     '</div>';
   } else {
     marginCard = '<div class="kpi-card hero accent"><p class="kpi-label">' + current + ' Margin</p><p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p></div>';
@@ -321,13 +334,14 @@ function renderKPIs() {
     var dir = trend.pct > 0.5 ? 'up' : (trend.pct < -0.5 ? 'down' : 'flat');
     var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
     trendCard = '<div class="kpi-card hero motivational">' +
-      '<p class="kpi-label">90-DAY MOMENTUM</p>' +
+      '<p class="kpi-label">Recent Revenue (Last 3 mo.)</p>' +
+      '<p class="kpi-sublabel">vs prior 3 months</p>' +
       '<p class="kpi-value">' + fmt(trend.last3Sum) + '</p>' +
       '<p class="kpi-context">' + trendLabel + '</p>' +
       '<div class="kpi-spark">' + sparkline(trend.recentValues, '#444735') + '</div>' +
       '<div class="kpi-trend ' + dir + '">' +
         '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + Math.abs(trend.pct).toFixed(0) + '%</span>' +
-        '<span class="trend-meta">vs prior 3 months</span>' +
+        '<span class="trend-meta">' + trend.recentLabels[0] + ' to ' + trend.recentLabels[trend.recentLabels.length-1] + '</span>' +
       '</div>' +
     '</div>';
   } else {
@@ -335,6 +349,130 @@ function renderKPIs() {
   }
 
   document.getElementById('kpiGrid').innerHTML = paceCard + marginCard + trendCard;
+}
+
+// ─────────────────────────────────────────────────
+// THERMOMETER PROGRESS TRACKER
+// ─────────────────────────────────────────────────
+function renderThermometer(mode) {
+  var byYM = aggregateByYearMonth();
+  var byYear = aggregateByYear();
+  var current = getCurrentYear();
+  var goals = computeGoals();
+
+  // Find best historical year for the chosen metric
+  var historical = Object.keys(byYear).filter(function(y){ return y !== current; });
+  if (!historical.length) {
+    document.getElementById('thermometerWrap').innerHTML = '<p style="text-align:center;color:var(--ink-xlight);font-size:13px;font-style:italic;padding:40px;">Need at least 2 years of data to show progress against best year.</p>';
+    return;
+  }
+  var bestYear = historical.reduce(function(best, y) {
+    if (!best || byYear[y][mode] > byYear[best][mode]) return y;
+    return best;
+  }, null);
+  var goalValue = byYear[bestYear][mode];
+
+  // Current YTD
+  var currentYTD = byYear[current][mode];
+  var pct = goalValue > 0 ? Math.min(100, (currentYTD / goalValue * 100)) : 0;
+  var pctRaw = goalValue > 0 ? (currentYTD / goalValue * 100) : 0;
+
+  // Build month-by-month breakdown for this year (so we can show segments)
+  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  var monthData = months.map(function(m) {
+    var k = current + '-' + m;
+    return (byYM[k] || {})[mode] || 0;
+  });
+
+  // Cumulative running totals
+  var cumulative = [];
+  var running = 0;
+  monthData.forEach(function(v) {
+    running += v;
+    cumulative.push(running);
+  });
+
+  // Build segmented progress bar — each month is a segment in the fill
+  var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var segments = monthData.map(function(v, i) {
+    if (v === 0) return null;
+    var width = goalValue > 0 ? (v / goalValue * 100) : 0;
+    return { month: monthNames[i], value: v, widthPct: width, cumulative: cumulative[i] };
+  }).filter(Boolean);
+
+  // Status messaging
+  var statusLabel, statusClass;
+  if (pctRaw >= 100) {
+    statusLabel = '✓ Goal Achieved';
+    statusClass = 'achieved';
+  } else if (pctRaw >= 75) {
+    statusLabel = 'Closing In';
+    statusClass = 'on-track';
+  } else if (pctRaw >= 50) {
+    statusLabel = 'Halfway There';
+    statusClass = 'on-track';
+  } else if (pctRaw >= 25) {
+    statusLabel = 'Building';
+    statusClass = 'building';
+  } else {
+    statusLabel = 'Just Getting Started';
+    statusClass = 'building';
+  }
+
+  var metricLabel = mode === 'revenue' ? 'Revenue' : 'Profit';
+  var color = mode === 'revenue' ? '#444735' : '#b89653';
+
+  // Build tick marks at 25%, 50%, 75%, 100%
+  var ticks = [25, 50, 75, 100];
+
+  var html =
+    '<div class="thermo-stats">' +
+      '<div class="thermo-stat">' +
+        '<p class="thermo-stat-label">' + current + ' YTD ' + metricLabel + '</p>' +
+        '<p class="thermo-stat-value">' + fmt(currentYTD) + '</p>' +
+      '</div>' +
+      '<div class="thermo-stat align-right">' +
+        '<p class="thermo-stat-label">Goal (' + bestYear + ' Best)</p>' +
+        '<p class="thermo-stat-value">' + fmt(goalValue) + '</p>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="thermo-bar-wrap">' +
+      '<div class="thermo-track">' +
+        ticks.map(function(t) {
+          return '<div class="thermo-tick" style="left:' + t + '%;"><span class="thermo-tick-label">' + t + '%</span></div>';
+        }).join('') +
+        '<div class="thermo-fill ' + statusClass + '" style="width:' + pct + '%;background:' + color + ';">' +
+          segments.map(function(s, i) {
+            // Don't show segment dividers for clarity — keep it as a single fill
+            return '';
+          }).join('') +
+        '</div>' +
+        '<div class="thermo-marker" style="left:' + Math.min(99, pct) + '%;">' +
+          '<div class="thermo-marker-dot" style="background:' + color + ';"></div>' +
+          '<div class="thermo-marker-label">' + pctRaw.toFixed(0) + '%</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="thermo-status">' +
+      '<span class="thermo-status-pill ' + statusClass + '">' + statusLabel + '</span>' +
+      '<span class="thermo-remaining">' +
+        (pctRaw >= 100
+          ? 'Surpassed by ' + fmt(currentYTD - goalValue)
+          : fmt(goalValue - currentYTD) + ' to goal') +
+      '</span>' +
+    '</div>';
+
+  document.getElementById('thermometerWrap').innerHTML = html;
+  currentTrackerMode = mode;
+}
+
+function switchTracker(mode, btn) {
+  var parent = btn.parentNode;
+  parent.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  renderThermometer(mode);
 }
 
 // ─────────────────────────────────────────────────
@@ -449,14 +587,16 @@ function buildTrendChart(mode) {
 }
 
 function switchTrend(mode, btn) {
-  // Only deactivate metric tabs (the ones with data-mode)
-  document.querySelectorAll('.tab-btn[data-mode]').forEach(function(b){b.classList.remove('active');});
+  // Only deactivate sibling metric tabs
+  var siblings = btn.parentNode.querySelectorAll('.tab-btn[data-mode]');
+  siblings.forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   buildTrendChart(mode);
 }
 
 function switchPeriod(period, btn) {
-  document.querySelectorAll('.tab-btn[data-period]').forEach(function(b){b.classList.remove('active');});
+  var siblings = btn.parentNode.querySelectorAll('.tab-btn[data-period]');
+  siblings.forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   currentPeriodMode = period;
   buildTrendChart(currentTrendMode);
@@ -549,6 +689,7 @@ function clearDateFilters() {
 
 function refreshAll() {
   renderKPIs();
+  renderThermometer(currentTrackerMode);
   buildTrendChart(currentTrendMode);
 }
 
@@ -557,6 +698,7 @@ function refreshAll() {
 // ─────────────────────────────────────────────────
 if (ALL_PROJECTS.length) {
   renderKPIs();
+  renderThermometer('revenue');
   buildTrendChart('profit');
   buildYoYChart();
   buildYearBtns();
