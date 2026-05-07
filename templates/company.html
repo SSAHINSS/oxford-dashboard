@@ -181,7 +181,7 @@ function computeGoals() {
   if (!historical.length) {
     return { revenue: null, margin: null, sourceYear: null };
   }
-  // Best historical revenue year
+  // Best historical revenue year (full-year)
   var bestRev = historical.reduce(function(best, y) {
     if (!best || byYear[y].revenue > byYear[best].revenue) return y;
     return best;
@@ -193,9 +193,44 @@ function computeGoals() {
   return {
     revenue:     byYear[bestRev].revenue,
     revenueYear: bestRev,
+    revenueFull: byYear[bestRev].revenue,
     margin:      byYear[bestMargin].margin,
     marginYear:  bestMargin,
   };
+}
+
+// For YTD comparison: months current year has data for
+function getCurrentYTDMonths() {
+  var byYM = aggregateByYearMonth();
+  var current = getCurrentYear();
+  var months = [];
+  for (var i = 1; i <= 12; i++) {
+    var m = i < 10 ? '0' + i : '' + i;
+    if (byYM[current + '-' + m] && byYM[current + '-' + m].revenue > 0) {
+      months.push(m);
+    }
+  }
+  return months;
+}
+
+// Sum goal year revenue for ONLY the months current year covers
+function goalYearYTDRevenue(goalYear) {
+  var byYM = aggregateByYearMonth();
+  var ytdMonths = getCurrentYTDMonths();
+  var sum = 0;
+  ytdMonths.forEach(function(m) {
+    var k = goalYear + '-' + m;
+    if (byYM[k]) sum += byYM[k].revenue || 0;
+  });
+  return { sum: sum, monthCount: ytdMonths.length };
+}
+
+function lastMonthName() {
+  var byYM = aggregateByYearMonth();
+  var current = getCurrentYear();
+  var ytd = getCurrentYTDMonths();
+  if (!ytd.length) return '';
+  return monthName(ytd[ytd.length - 1]);
 }
 
 // ─────────────────────────────────────────────────
@@ -455,25 +490,31 @@ function renderKPIs() {
   var current = getCurrentYear();
   var currentData = byYear[current] || { revenue:0, profit:0, margin:0 };
 
-  // ─── CARD 1: REVENUE ───
+  // ─── CARD 1: REVENUE — YTD vs same period in best year ───
   var paceCard;
-  if (goals.revenue) {
-    var pctDiff = ((currentData.revenue - goals.revenue) / Math.abs(goals.revenue) * 100);
+  if (goals.revenueYear) {
+    var goalYTD = goalYearYTDRevenue(goals.revenueYear);  // best year, same months as current YTD
+    var goalYTDValue = goalYTD.sum;
+    var lastMo = lastMonthName();
+    var pctDiff = goalYTDValue > 0
+      ? ((currentData.revenue - goalYTDValue) / Math.abs(goalYTDValue) * 100)
+      : 0;
     var dirArrow = pctDiff >= 0 ? '▲' : '▼';
     var varClass = pctDiff >= 0 ? 'pos' : 'neg';
+    var diffAmt = currentData.revenue - goalYTDValue;
     paceCard = '<div class="kpi-card hero motivational">' +
       '<div class="card-header">' +
-        '<p class="kpi-label">' + current + ' Revenue · YTD</p>' +
+        '<p class="kpi-label">' + current + ' Revenue · Jan–' + lastMo + '</p>' +
         '<span class="variance-badge ' + varClass + '">' + dirArrow + ' ' + Math.abs(pctDiff).toFixed(0) + '%</span>' +
       '</div>' +
       '<p class="kpi-value">' + fmt(currentData.revenue) + '</p>' +
       '<div class="kpi-comparison">' +
-        '<span class="cmp-label">' + goals.revenueYear + ' Total</span>' +
-        '<span class="cmp-value">' + fmt(goals.revenue) + '</span>' +
+        '<span class="cmp-label">' + goals.revenueYear + ' · Same Period</span>' +
+        '<span class="cmp-value">' + fmt(goalYTDValue) + '</span>' +
       '</div>' +
       '<div class="kpi-comparison gap">' +
-        '<span class="cmp-label">' + (pctDiff >= 0 ? 'Surplus' : 'Gap to goal') + '</span>' +
-        '<span class="cmp-value ' + varClass + '">' + fmt(Math.abs(currentData.revenue - goals.revenue)) + '</span>' +
+        '<span class="cmp-label">' + (diffAmt >= 0 ? 'Ahead by' : 'Behind by') + '</span>' +
+        '<span class="cmp-value ' + varClass + '">' + fmt(Math.abs(diffAmt)) + '</span>' +
       '</div>' +
     '</div>';
   } else {
