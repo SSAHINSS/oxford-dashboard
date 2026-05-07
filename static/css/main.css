@@ -795,6 +795,15 @@ body {
   color: var(--ink-light);
   white-space: nowrap;
 }
+/* Company-view section labels are bigger and use serif */
+body.company-view .section-label {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  color: var(--ink);
+}
 .section-line {
   flex: 1;
   height: 1px;
@@ -870,8 +879,8 @@ body {
 .chart-wrap {
   background: white;
   border: 1px solid var(--border);
-  padding: 30px;
-  margin-bottom: 56px;
+  padding: 36px;
+  margin-bottom: 40px;
   box-shadow: var(--shadow-md);
 }
 .chart-tabs {
@@ -1448,27 +1457,28 @@ body {
 
 /* Hero KPI cards — bigger for office display */
 .kpi-card.hero {
-  padding: 32px 30px 26px;
-  min-height: 280px;
+  padding: 28px 32px 24px;
+  min-height: 340px;
 }
 .kpi-card.hero .kpi-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   margin-bottom: 4px;
   color: var(--ink);
 }
 .kpi-card.hero .kpi-value {
-  font-size: 56px;
-  margin-bottom: 8px;
+  font-size: 76px;
+  margin-bottom: 10px;
+  line-height: 0.95;
 }
 .kpi-card.hero .kpi-context {
   font-size: 11px;
   margin-bottom: 18px;
 }
 .kpi-card.hero .kpi-spark {
-  height: 56px;
-  margin: 0 -4px 16px;
+  height: 80px;
+  margin: 6px -4px 18px;
 }
 .kpi-card.hero .kpi-trend {
   font-size: 12px;
@@ -1599,10 +1609,16 @@ body {
    ════════════════════════════════════════════════ */
 body.company-view .main {
   max-width: none;
-  padding: 32px 48px 64px;
+  padding: 24px 32px 48px;
 }
 @media (max-width: 1024px) {
-  body.company-view .main { padding: 24px 24px 48px; }
+  body.company-view .main { padding: 20px 20px 40px; }
+}
+
+/* Big page-level title for company view */
+body.company-view .company-topbar {
+  margin-bottom: 20px;
+  padding-bottom: 18px;
 }
 
 /* ════════════════════════════════════════════════
@@ -1639,7 +1655,7 @@ body.company-view .main {
 .thermo-stat.align-right { text-align: right; }
 .thermo-stat-value {
   font-family: var(--serif);
-  font-size: 36px;
+  font-size: 56px;
   font-weight: 400;
   line-height: 1;
   color: var(--ink);
@@ -1651,14 +1667,14 @@ body.company-view .main {
 
 /* Bar with tick marks */
 .thermo-bar-wrap {
-  margin: 60px 0 24px;
+  margin: 76px 0 36px;
   position: relative;
   padding: 0 8px;
   overflow: visible;
 }
 .thermo-track {
   position: relative;
-  height: 40px;
+  height: 56px;
   background: #e4e6dc;
   border: 1px solid var(--border);
   border-radius: 3px;
@@ -1710,7 +1726,7 @@ body.company-view .main {
 /* Marker / current position */
 .thermo-marker {
   position: absolute;
-  top: -34px;
+  top: -50px;
   transform: translateX(-50%);
   z-index: 3;
   display: flex;
@@ -1720,24 +1736,24 @@ body.company-view .main {
 }
 .thermo-marker-label {
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--ink);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
   white-space: nowrap;
   background: white;
-  padding: 3px 10px;
-  border: 1.5px solid var(--ink);
+  padding: 6px 14px;
+  border: 2px solid var(--ink);
   border-radius: 2px;
 }
 .thermo-marker-dot {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  border: 3px solid white;
-  box-shadow: 0 0 0 1px var(--ink-light), 0 2px 6px rgba(0,0,0,0.15);
+  border: 4px solid white;
+  box-shadow: 0 0 0 1px var(--ink-light), 0 2px 8px rgba(0,0,0,0.18);
 }
 
 /* Status row */
@@ -1751,9 +1767,9 @@ body.company-view .main {
 }
 .thermo-status-pill {
   display: inline-block;
-  padding: 8px 18px;
+  padding: 12px 24px;
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1763,7 +1779,7 @@ body.company-view .main {
 .thermo-status-pill.building  { background: var(--gold-faint); color: var(--gold-dark); border: 1px solid var(--gold-light); }
 .thermo-remaining {
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: 20px;
   color: var(--ink);
   font-weight: 600;
   font-variant-numeric: tabular-nums;

@@ -44,7 +44,7 @@
 <div class="kpi-grid hero" id="kpiGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;width:100%;"></div>
 
 <!-- CUMULATIVE PROGRESS — thermometer style -->
-<section style="margin-bottom: 56px;">
+<section style="margin-bottom: 32px;">
   <div class="section-header"><span class="section-label">Year Progress</span><div class="section-line"></div></div>
   <div class="chart-wrap">
     <div class="chart-tabs" style="margin-bottom: 32px;">
@@ -56,7 +56,7 @@
 </section>
 
 <!-- MONTHLY/QUARTERLY DETAIL CHART -->
-<section style="margin-bottom: 56px;">
+<section style="margin-bottom: 32px;">
   <div class="section-header"><span class="section-label">By Period</span><div class="section-line"></div></div>
   <div class="chart-wrap">
     <div class="chart-toolbar">
@@ -70,16 +70,16 @@
         <button class="tab-btn active" data-period="quarterly" onclick="switchPeriod('quarterly',this)">Quarterly</button>
       </div>
     </div>
-    <div class="chart-canvas-wrap" style="height:340px;"><canvas id="trendChart"></canvas></div>
+    <div class="chart-canvas-wrap" style="height:420px;"><canvas id="trendChart"></canvas></div>
     <div class="legend-row" id="trendLegend" style="margin-top:18px;justify-content:center;"></div>
   </div>
 </section>
 
 <!-- YEAR-OVER-YEAR (smaller, secondary) -->
-<section style="margin-bottom: 56px;">
+<section style="margin-bottom: 32px;">
   <div class="section-header"><span class="section-label">Historical Context</span><div class="section-line"></div></div>
   <div class="chart-wrap">
-    <div class="chart-canvas-wrap" style="height:280px;"><canvas id="yoyChart"></canvas></div>
+    <div class="chart-canvas-wrap" style="height:360px;"><canvas id="yoyChart"></canvas></div>
     <div class="legend-row" id="yoyLegend" style="margin-top:18px;justify-content:center;"></div>
   </div>
 </section>
