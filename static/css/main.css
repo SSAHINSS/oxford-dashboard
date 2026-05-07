@@ -1883,15 +1883,35 @@ body.company-view .company-topbar {
 /* Variance badge — large, unmissable */
 .variance-badge {
   font-family: var(--sans);
-  font-weight: 700;
-  font-size: 24px;
-  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
-  padding: 12px 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
   border-radius: 2px;
   white-space: nowrap;
   flex-shrink: 0;
   line-height: 1;
+}
+.variance-badge .vb-arrow {
+  font-size: 16px;
+  font-weight: 700;
+}
+.variance-badge .vb-num {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.variance-badge .vb-vs {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  padding-left: 2px;
+  border-left: 1px solid currentColor;
+  padding-left: 10px;
+  margin-left: 2px;
 }
 .variance-badge.pos { background: rgba(74, 124, 89, 0.14);  color: var(--pos); }
 .variance-badge.neg { background: rgba(160, 86, 74, 0.14);  color: var(--neg); }
@@ -1923,9 +1943,9 @@ body.company-view .company-topbar {
 .kpi-comparison.gap { border-top: 1px solid var(--border-light); }
 
 .cmp-label {
-  font-size: 14px;
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-light);
   white-space: nowrap;
@@ -1940,29 +1960,36 @@ body.company-view .company-topbar {
 .cmp-value.pos { color: var(--pos); }
 .cmp-value.neg { color: var(--neg); }
 .cmp-value-sm {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 500;
   color: var(--ink-light);
   font-variant-numeric: tabular-nums;
   font-style: italic;
+  letter-spacing: 0.01em;
 }
 
 @media (max-width: 1300px) {
   .kpi-card.hero .kpi-value { font-size: 96px; }
   .kpi-card.hero { padding: 36px 40px 32px; min-height: 380px; }
   .kpi-card.hero .kpi-label { font-size: 19px; }
+  .cmp-label, .cmp-value-sm { font-size: 19px; }
+  .cmp-value { font-size: 23px; }
 }
 @media (max-width: 1100px) {
   .kpi-card.hero .kpi-value { font-size: 76px; }
   .kpi-card.hero { min-height: 340px; }
   .kpi-card.hero .kpi-label { font-size: 17px; }
-  .variance-badge { font-size: 18px; padding: 8px 14px; }
+  .cmp-label, .cmp-value-sm { font-size: 17px; }
+  .cmp-value { font-size: 21px; }
+  .variance-badge .vb-num { font-size: 20px; }
+  .variance-badge .vb-vs  { font-size: 10px; }
 }
 @media (max-width: 820px) {
   .kpi-card.hero .kpi-value { font-size: 60px; }
   .kpi-card.hero .kpi-label { font-size: 14px; }
-  .variance-badge { font-size: 15px; padding: 6px 11px; }
-  .cmp-value { font-size: 20px; }
+  .cmp-label, .cmp-value-sm { font-size: 14px; }
+  .cmp-value { font-size: 18px; }
+  .variance-badge .vb-num { font-size: 16px; }
 }
 
 

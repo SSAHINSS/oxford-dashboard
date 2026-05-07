@@ -505,7 +505,7 @@ function renderKPIs() {
     paceCard = '<div class="kpi-card hero motivational">' +
       '<div class="card-header">' +
         '<p class="kpi-label">' + current + ' Revenue · Jan–' + lastMo + '</p>' +
-        '<span class="variance-badge ' + varClass + '">' + dirArrow + ' ' + Math.abs(pctDiff).toFixed(0) + '%</span>' +
+        '<span class="variance-badge ' + varClass + '"><span class="vb-arrow">' + dirArrow + '</span><span class="vb-num">' + Math.abs(pctDiff).toFixed(0) + '%</span><span class="vb-vs">vs ' + goals.revenueYear + '</span></span>' +
       '</div>' +
       '<p class="kpi-value">' + fmt(currentData.revenue) + '</p>' +
       '<div class="kpi-comparison">' +
@@ -530,7 +530,7 @@ function renderKPIs() {
     marginCard = '<div class="kpi-card hero motivational accent">' +
       '<div class="card-header">' +
         '<p class="kpi-label">' + current + ' Margin · YTD</p>' +
-        '<span class="variance-badge ' + marginVarClass + '">' + marginArrow + ' ' + Math.abs(marginDiff).toFixed(1) + ' pts</span>' +
+        '<span class="variance-badge ' + marginVarClass + '"><span class="vb-arrow">' + marginArrow + '</span><span class="vb-num">' + Math.abs(marginDiff).toFixed(1) + ' pts</span><span class="vb-vs">vs ' + goals.marginYear + '</span></span>' +
       '</div>' +
       '<p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p>' +
       '<div class="kpi-comparison">' +
@@ -556,7 +556,7 @@ function renderKPIs() {
     trendCard = '<div class="kpi-card hero motivational">' +
       '<div class="card-header">' +
         '<p class="kpi-label">Last 3 Months · Revenue</p>' +
-        '<span class="variance-badge ' + momVarClass + '">' + momArrow + ' ' + Math.abs(trend.pct).toFixed(0) + '%</span>' +
+        '<span class="variance-badge ' + momVarClass + '"><span class="vb-arrow">' + momArrow + '</span><span class="vb-num">' + Math.abs(trend.pct).toFixed(0) + '%</span><span class="vb-vs">vs prior 3 mo.</span></span>' +
       '</div>' +
       '<p class="kpi-value">' + fmt(trend.last3Sum) + '</p>' +
       '<div class="kpi-comparison">' +
