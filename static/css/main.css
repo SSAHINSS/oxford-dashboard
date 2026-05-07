@@ -1845,3 +1845,123 @@ body.company-view .company-topbar {
   height: 90px;
   margin: 4px -4px 4px;
 }
+
+
+/* ════════════════════════════════════════════════
+   COMPANY KPI CARDS — numbers only, clean
+   ════════════════════════════════════════════════ */
+
+.kpi-card.hero {
+  padding: 32px 36px 28px;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Header row: label + variance badge */
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.kpi-card.hero .kpi-label {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0;
+  flex: 1;
+  line-height: 1.4;
+}
+
+/* Variance badge — large, unmissable */
+.variance-badge {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  padding: 8px 14px;
+  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.variance-badge.pos { background: rgba(74, 124, 89, 0.14);  color: var(--pos); }
+.variance-badge.neg { background: rgba(160, 86, 74, 0.14);  color: var(--neg); }
+
+/* Hero number — dominant */
+.kpi-card.hero .kpi-value {
+  font-family: var(--serif);
+  font-size: 84px;
+  font-weight: 400;
+  line-height: 0.95;
+  margin: 0 0 28px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.kpi-card.hero.accent .kpi-value { color: var(--gold-dark); }
+
+/* Comparison rows — label/value pair, two per card */
+.kpi-comparison {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-light);
+  font-family: var(--sans);
+}
+.kpi-comparison.gap { border-top: 1px solid var(--border-light); }
+
+.cmp-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+}
+.cmp-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.cmp-value.pos { color: var(--pos); }
+.cmp-value.neg { color: var(--neg); }
+.cmp-value-sm {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-light);
+  font-variant-numeric: tabular-nums;
+  font-style: italic;
+}
+
+@media (max-width: 1100px) {
+  .kpi-card.hero .kpi-value { font-size: 64px; }
+}
+@media (max-width: 820px) {
+  .kpi-card.hero .kpi-value { font-size: 52px; }
+  .variance-badge { font-size: 15px; padding: 6px 11px; }
+}
+
+
+/* Hide leftover chart elements from previous designs */
+.kpi-card.hero .kpi-spark,
+.kpi-card.hero .kpi-chart-legend,
+.kpi-card.hero .kpi-trend,
+.kpi-card.hero .kpi-context,
+.kpi-card.hero .kpi-sublabel,
+.kpi-card.hero .progress-track,
+.kpi-card.hero .progress-text,
+.kpi-card.hero .goal-source,
+.kpi-card.hero .progress-badge,
+.kpi-card.hero .card-head-row {
+  display: none !important;
+}

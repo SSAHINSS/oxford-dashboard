@@ -455,95 +455,80 @@ function renderKPIs() {
   var current = getCurrentYear();
   var currentData = byYear[current] || { revenue:0, profit:0, margin:0 };
 
-  // Card 1: Pace toward annual revenue goal
-  var pacePct = goals.revenue ? (currentData.revenue / goals.revenue * 100) : null;
+  // ─── CARD 1: REVENUE ───
   var paceCard;
   if (goals.revenue) {
-    var paceLabel = pacePct >= 100 ? 'Above Target' : 'Below Target';
     var pctDiff = ((currentData.revenue - goals.revenue) / Math.abs(goals.revenue) * 100);
     var dirArrow = pctDiff >= 0 ? '▲' : '▼';
     var varClass = pctDiff >= 0 ? 'pos' : 'neg';
     paceCard = '<div class="kpi-card hero motivational">' +
-      '<div class="card-head-row">' +
-        '<div>' +
-          '<p class="kpi-label">' + current + ' Revenue (YTD)</p>' +
-          '<p class="kpi-sublabel">vs ' + goals.revenueYear + ' full-year total</p>' +
-        '</div>' +
+      '<div class="card-header">' +
+        '<p class="kpi-label">' + current + ' Revenue · YTD</p>' +
         '<span class="variance-badge ' + varClass + '">' + dirArrow + ' ' + Math.abs(pctDiff).toFixed(0) + '%</span>' +
       '</div>' +
       '<p class="kpi-value">' + fmt(currentData.revenue) + '</p>' +
-      '<p class="kpi-context">' + paceLabel + '</p>' +
-      '<div class="kpi-spark">' + revenueCurve(current, goals.revenueYear, goals.revenue) + '</div>' +
-      '<div class="kpi-chart-legend">' +
-        '<span class="leg-item"><span class="leg-dot" style="background:#444735;"></span>' + current + ' YTD</span>' +
-        '<span class="leg-item"><span class="leg-dot" style="background:transparent;border:1.5px dashed #b89653;"></span>' + goals.revenueYear + ' pace</span>' +
+      '<div class="kpi-comparison">' +
+        '<span class="cmp-label">' + goals.revenueYear + ' Total</span>' +
+        '<span class="cmp-value">' + fmt(goals.revenue) + '</span>' +
       '</div>' +
-      progressBar(currentData.revenue, goals.revenue, false) +
+      '<div class="kpi-comparison gap">' +
+        '<span class="cmp-label">' + (pctDiff >= 0 ? 'Surplus' : 'Gap to goal') + '</span>' +
+        '<span class="cmp-value ' + varClass + '">' + fmt(Math.abs(currentData.revenue - goals.revenue)) + '</span>' +
+      '</div>' +
     '</div>';
   } else {
-    paceCard = '<div class="kpi-card hero"><p class="kpi-label">' + current + ' Revenue</p><p class="kpi-value">' + fmt(currentData.revenue) + '</p><p class="kpi-context">No prior year for goal</p></div>';
+    paceCard = '<div class="kpi-card hero"><p class="kpi-label">' + current + ' Revenue · YTD</p><p class="kpi-value">' + fmt(currentData.revenue) + '</p></div>';
   }
 
-  // Card 2: Margin % vs target
+  // ─── CARD 2: MARGIN ───
   var marginCard;
   if (goals.margin) {
-    var marginPct = goals.margin > 0 ? (currentData.margin / goals.margin * 100) : 0;
-    var marginLabel = currentData.margin >= goals.margin ? 'Above Target' :
-                      marginPct >= 90  ? 'Near Target' :
-                      marginPct >= 75  ? 'Building Strength' :
-                      'Room to Grow';
     var marginDiff = currentData.margin - goals.margin;
     var marginArrow = marginDiff >= 0 ? '▲' : '▼';
     var marginVarClass = marginDiff >= 0 ? 'pos' : 'neg';
     marginCard = '<div class="kpi-card hero motivational accent">' +
-      '<div class="card-head-row">' +
-        '<div>' +
-          '<p class="kpi-label">' + current + ' Margin (YTD)</p>' +
-          '<p class="kpi-sublabel">vs ' + goals.marginYear + ' full-year average</p>' +
-        '</div>' +
-        '<span class="variance-badge ' + marginVarClass + '">' + marginArrow + ' ' + Math.abs(marginDiff).toFixed(1) + 'pts</span>' +
+      '<div class="card-header">' +
+        '<p class="kpi-label">' + current + ' Margin · YTD</p>' +
+        '<span class="variance-badge ' + marginVarClass + '">' + marginArrow + ' ' + Math.abs(marginDiff).toFixed(1) + ' pts</span>' +
       '</div>' +
       '<p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p>' +
-      '<p class="kpi-context">' + marginLabel + '</p>' +
-      '<div class="kpi-spark">' + marginBars(current, goals.margin) + '</div>' +
-      '<div class="kpi-chart-legend">' +
-        '<span class="leg-item"><span class="leg-dot" style="background:#b89653;"></span>at/above target</span>' +
-        '<span class="leg-item"><span class="leg-dot" style="background:#a09585;"></span>below target</span>' +
+      '<div class="kpi-comparison">' +
+        '<span class="cmp-label">' + goals.marginYear + ' Average</span>' +
+        '<span class="cmp-value">' + goals.margin.toFixed(1) + '%</span>' +
       '</div>' +
-      progressBar(currentData.margin, goals.margin, true, true) +
+      '<div class="kpi-comparison gap">' +
+        '<span class="cmp-label">Profit on revenue</span>' +
+        '<span class="cmp-value">' + fmt(currentData.profit) + '</span>' +
+      '</div>' +
     '</div>';
   } else {
-    marginCard = '<div class="kpi-card hero accent"><p class="kpi-label">' + current + ' Margin</p><p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p></div>';
+    marginCard = '<div class="kpi-card hero accent"><p class="kpi-label">' + current + ' Margin · YTD</p><p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p></div>';
   }
 
-  // Card 3: Recent 3-month trend
+  // ─── CARD 3: 3-MONTH MOMENTUM ───
   var trend = recentTrend();
   var trendCard;
   if (trend) {
-    var trendLabel = trend.pct >= 0 ? 'Above Prior Period' : 'Below Prior Period';
-    var dir = trend.pct > 0.5 ? 'up' : (trend.pct < -0.5 ? 'down' : 'flat');
-    var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
-    var byYMforChart = aggregateByYearMonth();
     var momArrow = trend.pct >= 0 ? '▲' : '▼';
     var momVarClass = trend.pct >= 0 ? 'pos' : 'neg';
+    var priorSum = trend.last3Sum / (1 + trend.pct/100);  // back-calc prior sum from pct change
     trendCard = '<div class="kpi-card hero motivational">' +
-      '<div class="card-head-row">' +
-        '<div>' +
-          '<p class="kpi-label">Recent Revenue (Last 3 mo.)</p>' +
-          '<p class="kpi-sublabel">vs prior 3 months</p>' +
-        '</div>' +
+      '<div class="card-header">' +
+        '<p class="kpi-label">Last 3 Months · Revenue</p>' +
         '<span class="variance-badge ' + momVarClass + '">' + momArrow + ' ' + Math.abs(trend.pct).toFixed(0) + '%</span>' +
       '</div>' +
       '<p class="kpi-value">' + fmt(trend.last3Sum) + '</p>' +
-      '<p class="kpi-context">' + trendLabel + '</p>' +
-      '<div class="kpi-spark">' + momentumChart(byYMforChart) + '</div>' +
-      '<div class="kpi-chart-legend">' +
-        '<span class="leg-item"><span class="leg-dot" style="background:#a09585;"></span>prior 3 months</span>' +
-        '<span class="leg-item"><span class="leg-dot" style="background:#444735;"></span>recent 3 months</span>' +
+      '<div class="kpi-comparison">' +
+        '<span class="cmp-label">Prior 3 Months</span>' +
+        '<span class="cmp-value">' + fmt(priorSum) + '</span>' +
+      '</div>' +
+      '<div class="kpi-comparison gap">' +
+        '<span class="cmp-label">Period</span>' +
+        '<span class="cmp-value-sm">' + trend.recentLabels[0] + ' – ' + trend.recentLabels[trend.recentLabels.length-1] + '</span>' +
       '</div>' +
     '</div>';
   } else {
-    trendCard = '<div class="kpi-card hero"><p class="kpi-label">90-Day Momentum</p><p class="kpi-value">—</p><p class="kpi-context">Not enough history yet</p></div>';
+    trendCard = '<div class="kpi-card hero"><p class="kpi-label">Last 3 Months</p><p class="kpi-value">—</p></div>';
   }
 
   document.getElementById('kpiGrid').innerHTML = paceCard + marginCard + trendCard;
