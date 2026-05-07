@@ -255,7 +255,171 @@ function recentTrend() {
 }
 
 // ─────────────────────────────────────────────────
-// SPARKLINE
+// CARD CHARTS — each tailored to its metric
+// ─────────────────────────────────────────────────
+
+// Revenue card: YTD cumulative curve vs goal-pace dashed line
+function revenueCurve(currentYear, goalYear, goalTotal) {
+  var byYM = aggregateByYearMonth();
+  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  var w = 320, h = 90;
+
+  // Cumulative current year (only months with data)
+  var currentCumulative = [];
+  var running = 0;
+  var lastIdx = -1;
+  months.forEach(function(m, i) {
+    var k = currentYear + '-' + m;
+    if (byYM[k] && byYM[k].revenue > 0) {
+      running += byYM[k].revenue;
+      currentCumulative.push(running);
+      lastIdx = i;
+    } else if (lastIdx >= 0 && i <= 11) {
+      // Stop adding once we hit no-data months at the end
+    }
+  });
+  if (currentCumulative.length < 1) return '';
+
+  // Cumulative goal year (full year)
+  var goalCumulative = [];
+  var grunning = 0;
+  months.forEach(function(m) {
+    var k = goalYear + '-' + m;
+    if (byYM[k]) grunning += byYM[k].revenue || 0;
+    goalCumulative.push(grunning);
+  });
+
+  // Y axis scale = max of either cumulative
+  var max = Math.max(goalCumulative[goalCumulative.length-1], currentCumulative[currentCumulative.length-1]);
+  if (max === 0) return '';
+  var scale = function(v) { return h - (v / max) * (h - 10) - 5; };
+
+  // Goal line (dashed, full year)
+  var goalPts = goalCumulative.map(function(v, i) {
+    return ((i / 11) * w).toFixed(1) + ',' + scale(v).toFixed(1);
+  }).join(' ');
+
+  // Current line (solid, only filled months)
+  var curPts = currentCumulative.map(function(v, i) {
+    return ((i / 11) * w).toFixed(1) + ',' + scale(v).toFixed(1);
+  }).join(' ');
+
+  // Area below current
+  var areaPts = '0,' + h + ' ' + curPts + ' ' +
+    (((currentCumulative.length - 1) / 11) * w).toFixed(1) + ',' + h;
+
+  // End marker on current
+  var endX = (((currentCumulative.length - 1) / 11) * w).toFixed(1);
+  var endY = scale(currentCumulative[currentCumulative.length - 1]).toFixed(1);
+
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:100%;">' +
+    // Goal line dashed
+    '<polyline points="' + goalPts + '" fill="none" stroke="#b89653" stroke-width="2" stroke-dasharray="5,4" stroke-linejoin="round"/>' +
+    // Area + current line
+    '<polygon points="' + areaPts + '" fill="#444735" fill-opacity="0.10"/>' +
+    '<polyline points="' + curPts + '" fill="none" stroke="#444735" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + endX + '" cy="' + endY + '" r="4" fill="#444735" stroke="white" stroke-width="2"/>' +
+  '</svg>';
+}
+
+// Margin card: monthly margin bars with target line
+function marginBars(currentYear, target) {
+  var byYM = aggregateByYearMonth();
+  var months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  var w = 320, h = 90;
+
+  var values = months.map(function(m) {
+    var k = currentYear + '-' + m;
+    var d = byYM[k];
+    if (!d || !d.revenue) return null;
+    return d.profit / d.revenue * 100;
+  }).filter(function(v) { return v !== null; });
+
+  if (!values.length) return '';
+
+  var max = Math.max(target, Math.max.apply(null, values)) * 1.1;
+  var min = Math.max(0, Math.min.apply(null, values) * 0.9);
+  var range = max - min || 1;
+  var scale = function(v) { return h - ((v - min) / range) * (h - 10) - 5; };
+
+  var barW = (w / values.length) * 0.7;
+  var gap  = (w / values.length) * 0.3;
+  var bars = values.map(function(v, i) {
+    var x = i * (barW + gap) + gap / 2;
+    var y = scale(v);
+    var barH = h - y - 5;
+    var aboveTarget = v >= target;
+    var color = aboveTarget ? '#b89653' : '#a09585';
+    return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) +
+           '" width="' + barW.toFixed(1) + '" height="' + Math.max(2, barH).toFixed(1) +
+           '" fill="' + color + '" rx="1"/>';
+  }).join('');
+
+  // Target line
+  var targetY = scale(target).toFixed(1);
+
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:100%;">' +
+    bars +
+    '<line x1="0" y1="' + targetY + '" x2="' + w + '" y2="' + targetY +
+       '" stroke="#353738" stroke-width="1.5" stroke-dasharray="4,3"/>' +
+    '<text x="' + (w - 4) + '" y="' + (parseFloat(targetY) - 4) +
+       '" font-size="10" font-family="Inter,sans-serif" font-weight="600" fill="#353738" text-anchor="end">target ' +
+       target.toFixed(1) + '%</text>' +
+  '</svg>';
+}
+
+// Momentum card: last 6 months with prior-3 vs recent-3 visually split
+function momentumChart(byYM) {
+  var keys = Object.keys(byYM).filter(function(k){ return byYM[k].revenue > 0; }).sort();
+  if (keys.length < 4) return '';
+  var window = keys.slice(-6);
+  var values = window.map(function(k){ return byYM[k].revenue; });
+  if (values.length < 4) return '';
+
+  var w = 320, h = 90;
+  var max = Math.max.apply(null, values);
+  var min = Math.min.apply(null, values);
+  var range = max - min || 1;
+
+  var splitIdx = window.length - 3;  // first 3 of 6 are "prior", last 3 are "recent"
+  var barW = (w / values.length) * 0.7;
+  var gap  = (w / values.length) * 0.3;
+
+  // Bars
+  var bars = values.map(function(v, i) {
+    var x = i * (barW + gap) + gap / 2;
+    var y = h - ((v - min) / range) * (h - 12) - 6;
+    var barH = h - y - 5;
+    var isRecent = i >= splitIdx;
+    var color = isRecent ? '#444735' : '#a09585';
+    return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) +
+           '" width="' + barW.toFixed(1) + '" height="' + Math.max(2, barH).toFixed(1) +
+           '" fill="' + color + '" rx="1"/>';
+  }).join('');
+
+  // Month labels under each bar
+  var labels = window.map(function(k, i) {
+    var p = k.split('-');
+    var label = monthName(p[1]);
+    var x = i * (barW + gap) + gap / 2 + barW / 2;
+    return '<text x="' + x.toFixed(1) + '" y="' + (h - 1) +
+           '" font-size="9" font-family="Inter,sans-serif" font-weight="500" fill="#a8a8a9" text-anchor="middle">' +
+           label + '</text>';
+  }).join('');
+
+  // Vertical divider between prior and recent
+  var dividerX = (splitIdx * (barW + gap)).toFixed(1);
+
+  return '<svg viewBox="0 0 ' + w + ' ' + (h + 10) + '" preserveAspectRatio="none" style="width:100%;height:100%;">' +
+    '<line x1="' + dividerX + '" y1="0" x2="' + dividerX + '" y2="' + (h - 10) +
+       '" stroke="#a8a8a9" stroke-width="1" stroke-dasharray="2,2"/>' +
+    bars +
+    labels +
+  '</svg>';
+}
+
+// ─────────────────────────────────────────────────
+// SPARKLINE (legacy fallback)
 // ─────────────────────────────────────────────────
 function sparkline(values, hex) {
   if (!values || values.length < 2) return '';
@@ -296,11 +460,24 @@ function renderKPIs() {
   var paceCard;
   if (goals.revenue) {
     var paceLabel = pacePct >= 100 ? 'Above Target' : 'Below Target';
+    var pctDiff = ((currentData.revenue - goals.revenue) / Math.abs(goals.revenue) * 100);
+    var dirArrow = pctDiff >= 0 ? '▲' : '▼';
+    var varClass = pctDiff >= 0 ? 'pos' : 'neg';
     paceCard = '<div class="kpi-card hero motivational">' +
-      '<p class="kpi-label">' + current + ' Revenue (YTD)</p>' +
-      '<p class="kpi-sublabel">vs ' + goals.revenueYear + ' full-year total</p>' +
+      '<div class="card-head-row">' +
+        '<div>' +
+          '<p class="kpi-label">' + current + ' Revenue (YTD)</p>' +
+          '<p class="kpi-sublabel">vs ' + goals.revenueYear + ' full-year total</p>' +
+        '</div>' +
+        '<span class="variance-badge ' + varClass + '">' + dirArrow + ' ' + Math.abs(pctDiff).toFixed(0) + '%</span>' +
+      '</div>' +
       '<p class="kpi-value">' + fmt(currentData.revenue) + '</p>' +
       '<p class="kpi-context">' + paceLabel + '</p>' +
+      '<div class="kpi-spark">' + revenueCurve(current, goals.revenueYear, goals.revenue) + '</div>' +
+      '<div class="kpi-chart-legend">' +
+        '<span class="leg-item"><span class="leg-dot" style="background:#444735;"></span>' + current + ' YTD</span>' +
+        '<span class="leg-item"><span class="leg-dot" style="background:transparent;border:1.5px dashed #b89653;"></span>' + goals.revenueYear + ' pace</span>' +
+      '</div>' +
       progressBar(currentData.revenue, goals.revenue, false) +
     '</div>';
   } else {
@@ -315,11 +492,24 @@ function renderKPIs() {
                       marginPct >= 90  ? 'Near Target' :
                       marginPct >= 75  ? 'Building Strength' :
                       'Room to Grow';
+    var marginDiff = currentData.margin - goals.margin;
+    var marginArrow = marginDiff >= 0 ? '▲' : '▼';
+    var marginVarClass = marginDiff >= 0 ? 'pos' : 'neg';
     marginCard = '<div class="kpi-card hero motivational accent">' +
-      '<p class="kpi-label">' + current + ' Margin (YTD)</p>' +
-      '<p class="kpi-sublabel">vs ' + goals.marginYear + ' full-year average</p>' +
+      '<div class="card-head-row">' +
+        '<div>' +
+          '<p class="kpi-label">' + current + ' Margin (YTD)</p>' +
+          '<p class="kpi-sublabel">vs ' + goals.marginYear + ' full-year average</p>' +
+        '</div>' +
+        '<span class="variance-badge ' + marginVarClass + '">' + marginArrow + ' ' + Math.abs(marginDiff).toFixed(1) + 'pts</span>' +
+      '</div>' +
       '<p class="kpi-value">' + currentData.margin.toFixed(1) + '%</p>' +
       '<p class="kpi-context">' + marginLabel + '</p>' +
+      '<div class="kpi-spark">' + marginBars(current, goals.margin) + '</div>' +
+      '<div class="kpi-chart-legend">' +
+        '<span class="leg-item"><span class="leg-dot" style="background:#b89653;"></span>at/above target</span>' +
+        '<span class="leg-item"><span class="leg-dot" style="background:#a09585;"></span>below target</span>' +
+      '</div>' +
       progressBar(currentData.margin, goals.margin, true, true) +
     '</div>';
   } else {
@@ -333,15 +523,23 @@ function renderKPIs() {
     var trendLabel = trend.pct >= 0 ? 'Above Prior Period' : 'Below Prior Period';
     var dir = trend.pct > 0.5 ? 'up' : (trend.pct < -0.5 ? 'down' : 'flat');
     var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '—');
+    var byYMforChart = aggregateByYearMonth();
+    var momArrow = trend.pct >= 0 ? '▲' : '▼';
+    var momVarClass = trend.pct >= 0 ? 'pos' : 'neg';
     trendCard = '<div class="kpi-card hero motivational">' +
-      '<p class="kpi-label">Recent Revenue (Last 3 mo.)</p>' +
-      '<p class="kpi-sublabel">vs prior 3 months</p>' +
+      '<div class="card-head-row">' +
+        '<div>' +
+          '<p class="kpi-label">Recent Revenue (Last 3 mo.)</p>' +
+          '<p class="kpi-sublabel">vs prior 3 months</p>' +
+        '</div>' +
+        '<span class="variance-badge ' + momVarClass + '">' + momArrow + ' ' + Math.abs(trend.pct).toFixed(0) + '%</span>' +
+      '</div>' +
       '<p class="kpi-value">' + fmt(trend.last3Sum) + '</p>' +
       '<p class="kpi-context">' + trendLabel + '</p>' +
-      '<div class="kpi-spark">' + sparkline(trend.recentValues, '#444735') + '</div>' +
-      '<div class="kpi-trend ' + dir + '">' +
-        '<span class="trend-pill"><span class="trend-arrow">' + arrow + '</span> ' + Math.abs(trend.pct).toFixed(0) + '%</span>' +
-        '<span class="trend-meta">' + trend.recentLabels[0] + ' to ' + trend.recentLabels[trend.recentLabels.length-1] + '</span>' +
+      '<div class="kpi-spark">' + momentumChart(byYMforChart) + '</div>' +
+      '<div class="kpi-chart-legend">' +
+        '<span class="leg-item"><span class="leg-dot" style="background:#a09585;"></span>prior 3 months</span>' +
+        '<span class="leg-item"><span class="leg-dot" style="background:#444735;"></span>recent 3 months</span>' +
       '</div>' +
     '</div>';
   } else {

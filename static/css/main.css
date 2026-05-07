@@ -1785,3 +1785,63 @@ body.company-view .company-topbar {
   font-variant-numeric: tabular-nums;
   font-style: normal;
 }
+
+/* ════════════════════════════════════════════════
+   COMPANY CARD HEAD ROW + IN-CARD CHART LEGEND
+   ════════════════════════════════════════════════ */
+
+/* Top row of card: title block on left, big variance badge on right */
+.card-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.card-head-row > div { flex: 1; min-width: 0; }
+
+/* Big variance badge in card header */
+.variance-badge {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 12px;
+  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.variance-badge.pos { background: rgba(74, 124, 89, 0.14); color: var(--pos); }
+.variance-badge.neg { background: rgba(160, 86, 74, 0.14); color: var(--neg); }
+
+/* Reset sublabel margin since it's now in card-head-row */
+.card-head-row .kpi-sublabel { margin-top: 4px; margin-bottom: 0; }
+
+/* In-card chart legend */
+.kpi-chart-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  margin-bottom: 12px;
+  font-size: 11px;
+}
+.kpi-chart-legend .leg-item {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--ink-light);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.kpi-chart-legend .leg-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+/* Slightly more breathing room in the chart area inside card */
+.kpi-card.hero .kpi-spark {
+  height: 90px;
+  margin: 4px -4px 4px;
+}
